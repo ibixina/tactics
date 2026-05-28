@@ -1,0 +1,1803 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lichess Tactics Trainer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f1ea;
+      --panel: #fffdfa;
+      --ink: #202124;
+      --muted: #686868;
+      --line: #d8d1c4;
+      --accent: #276b63;
+      --accent-2: #b2483f;
+      --accent-3: #d19b2a;
+      --good: #26734d;
+      --bad: #b33a2f;
+      --board-light: #e6cba2;
+      --board-dark: #b97845;
+      --focus: #f5c84c;
+      --shadow: 0 18px 42px rgba(37, 31, 23, 0.12);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(135deg, rgba(39, 107, 99, 0.10), transparent 36%),
+        linear-gradient(315deg, rgba(178, 72, 63, 0.11), transparent 42%),
+        var(--bg);
+      color: var(--ink);
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 7px;
+      background: var(--ink);
+      color: white;
+      padding: 0.68rem 0.9rem;
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+      min-height: 42px;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    .square:hover { transform: none; }
+    button:disabled { cursor: not-allowed; opacity: 0.48; transform: none; }
+
+    .secondary {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    .accent { background: var(--accent); }
+    .danger { background: var(--accent-2); }
+
+    input, textarea {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: white;
+      color: var(--ink);
+      padding: 0.7rem 0.78rem;
+      outline: none;
+      min-height: 42px;
+      width: 100%;
+    }
+
+    input:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(39, 107, 99, 0.14);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 260px;
+      line-height: 1.45;
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(200px, 320px) auto auto 1fr;
+      gap: 0.7rem;
+      align-items: center;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 253, 250, 0.86);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .brand {
+      font-weight: 900;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 0.92rem;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status-wrap {
+      display: grid;
+      gap: 0.28rem;
+      min-width: 0;
+    }
+
+    .status-progress {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(216, 209, 196, 0.75);
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+
+    .status-progress.active {
+      opacity: 1;
+    }
+
+    .status-progress-fill {
+      height: 100%;
+      width: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      transition: width 140ms ease;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) 330px;
+      gap: 1rem;
+      padding: 1rem;
+      width: min(1580px, 100%);
+      margin: 0 auto;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 320px minmax(300px, 1fr);
+      gap: 1rem;
+      align-items: center;
+      min-height: 0;
+    }
+
+    .panel {
+      background: rgba(255, 253, 250, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .board-panel {
+      padding: 1rem;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 0.75rem;
+      justify-items: center;
+      align-items: center;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .board-shell {
+      position: relative;
+      width: min(100%, calc(100vh - 245px), 820px);
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 1;
+      display: block;
+    }
+
+    .promo-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      background: rgba(32, 33, 36, 0.45);
+      border-radius: 7px;
+    }
+
+    .promo-choices {
+      display: flex;
+      gap: 6px;
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+    }
+
+    .promo-option {
+      width: clamp(40px, 9vw, 68px);
+      height: clamp(40px, 9vw, 68px);
+      background-color: var(--board-light);
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: 80%;
+      border: 2px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 0;
+      min-height: 0;
+      transition: border-color 100ms ease, background-color 100ms ease;
+    }
+
+    .promo-option:hover {
+      border-color: var(--focus);
+      background-color: var(--board-dark);
+      transform: none;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid rgba(32, 33, 36, 0.34);
+      box-shadow: 0 12px 28px rgba(51, 34, 18, 0.22), inset 0 0 0 1px rgba(255,255,255,0.15);
+      touch-action: manipulation;
+      width: 100%;
+      height: 100%;
+      transition: box-shadow 160ms ease;
+    }
+
+    .board.glow-good {
+      box-shadow: 0 0 0 5px rgba(38, 115, 77, 0.25), 0 0 28px rgba(38, 115, 77, 0.8), 0 12px 28px rgba(51, 34, 18, 0.22);
+    }
+
+    .board.glow-bad {
+      box-shadow: 0 0 0 5px rgba(179, 58, 47, 0.25), 0 0 28px rgba(179, 58, 47, 0.8), 0 12px 28px rgba(51, 34, 18, 0.22);
+    }
+
+    .square {
+      position: relative;
+      border: 0;
+      border-radius: 0;
+      min-height: 0;
+      padding: 0;
+      color: #111;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.20), transparent 34%),
+        linear-gradient(45deg, rgba(120,71,27,0.08), transparent 58%),
+        var(--board-light);
+      box-shadow: none;
+      transform: none;
+    }
+
+    .square.dark {
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.13), transparent 32%),
+        linear-gradient(45deg, rgba(72,37,15,0.12), transparent 60%),
+        var(--board-dark);
+    }
+    .square.selected { outline: 4px solid var(--focus); outline-offset: -4px; }
+    .square.legal::after {
+      content: "";
+      width: 24%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: rgba(32, 33, 36, 0.28);
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .square.capture::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 78%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 5px solid rgba(32, 33, 36, 0.26);
+      background: transparent;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .square.last { box-shadow: inset 0 0 0 999px rgba(245, 200, 76, 0.24); }
+    .square.played { box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.22); }
+    .square.feedback-good { box-shadow: inset 0 0 0 999px rgba(38, 115, 77, 0.32); }
+    .square.feedback-bad { box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.32); }
+    .square.check {
+      box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.42);
+    }
+
+    .piece {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 86%;
+      height: 86%;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: contain;
+      filter: drop-shadow(0 2px 1px rgba(0,0,0,0.36));
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .piece.dragging-source {
+      opacity: 0.18;
+    }
+
+    .drag-ghost {
+      position: fixed;
+      z-index: 20;
+      width: min(10.5vw, 82px);
+      height: min(10.5vw, 82px);
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: contain;
+      filter: drop-shadow(0 8px 7px rgba(0,0,0,0.36));
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .coord {
+      position: absolute;
+      top: 4px;
+      right: 5px;
+      color: rgba(111, 64, 29, 0.72);
+      font-size: clamp(0.58rem, 1.55vw, 0.78rem);
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0;
+      pointer-events: none;
+      text-transform: uppercase;
+    }
+
+    .square.dark .coord {
+      color: rgba(255, 224, 177, 0.72);
+    }
+
+    .under-board {
+      display: grid;
+      gap: 0.75rem;
+      width: min(100%, calc(100vh - 245px), 820px);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+    }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-height: 42px;
+      padding: 0.55rem 0.72rem;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: rgba(255,255,255,0.62);
+      font-weight: 800;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle input {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.55rem;
+    }
+
+    .fact {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 0.65rem;
+      background: rgba(255,255,255,0.6);
+      min-width: 0;
+    }
+
+    .fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .fact strong {
+      display: block;
+      margin-top: 0.2rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .trainer-panel, .side-panel {
+      padding: 1rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .trainer-panel {
+      align-self: stretch;
+      min-height: 0;
+      max-height: 100%;
+      grid-template-rows: auto auto 1fr;
+      overflow: hidden;
+    }
+
+    .trainer-panel > div:last-child {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+    }
+
+    .trainer-panel textarea {
+      height: 100%;
+      min-height: 0;
+    }
+
+    .side-panel {
+      max-height: 100%;
+      overflow: auto;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .result {
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 0.75rem;
+      background: rgba(255,255,255,0.62);
+      line-height: 1.4;
+    }
+
+    .result.good { border-color: rgba(38, 115, 77, 0.45); color: var(--good); }
+    .result.bad { border-color: rgba(179, 58, 47, 0.45); color: var(--bad); }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 0.8rem;
+      background: rgba(255,255,255,0.62);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.55rem;
+      line-height: 1.1;
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+
+    .bars {
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 84px 1fr 48px;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .bar {
+      height: 12px;
+      border-radius: 999px;
+      background: #ece6db;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+      width: 0;
+      transition: width 180ms ease;
+    }
+
+    .bar-fill.warn { background: var(--accent-3); }
+    .bar-fill.bad { background: var(--accent-2); }
+
+    .sync-box {
+      display: grid;
+      gap: 0.6rem;
+    }
+
+    .sync-box label {
+      display: grid;
+      gap: 0.25rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .filter-field {
+      display: grid;
+      gap: 0.35rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin: 0.7rem 0;
+    }
+
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 1.2rem;
+      background: rgba(255,255,255,0.46);
+    }
+
+    @media (max-width: 1120px) {
+      .layout, .workspace {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+      }
+      .app {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+      }
+      .side-panel { order: -1; }
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+      .brand { white-space: normal; }
+      .facts, .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      .layout {
+        padding: 0.7rem;
+      }
+      .board-panel, .trainer-panel, .side-panel {
+        padding: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">Lichess Tactics Trainer</div>
+      <input id="username" autocomplete="username" placeholder="Lichess username">
+      <button id="fetchBtn" class="accent">Update</button>
+      <button id="fullFetchBtn" class="secondary">Full Refresh</button>
+      <div class="status-wrap">
+        <div id="status" class="status">Enter a username to fetch analyzed games.</div>
+        <div id="statusProgress" class="status-progress"><div id="statusProgressFill" class="status-progress-fill"></div></div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="workspace">
+        <div class="panel trainer-panel">
+          <div>
+            <h2 class="section-title">Puzzle <span id="queueFact" class="muted">0 due</span></h2>
+            <p id="prompt" class="muted">Fetch analyzed games to create tactics from your mistakes and blunders.</p>
+          </div>
+          <div id="result" class="result">No puzzle loaded.</div>
+          <div>
+            <h2 class="section-title">Notes <span id="noteState" class="muted">Autosaved locally</span></h2>
+            <textarea id="notes" placeholder="Store your calculation, missed motif, or review note for this puzzle."></textarea>
+          </div>
+        </div>
+
+        <div class="panel board-panel">
+          <div class="board-shell">
+            <div id="board" class="board" aria-label="Chess board"></div>
+          </div>
+          <div class="under-board">
+            <div class="controls">
+              <button id="prevBtn" class="secondary">Prev</button>
+              <button id="nextBtn" class="secondary">Next</button>
+              <button id="resetBtn" class="secondary">Reset</button>
+              <button id="showBtn" class="secondary">Show Answer</button>
+              <button id="analysisBtn" class="accent">Analyze on Lichess</button>
+              <label class="toggle"><input id="autoNextToggle" type="checkbox"> Auto-next</label>
+            </div>
+            <div class="facts">
+              <div class="fact"><span>Source</span><strong id="sourceFact">-</strong></div>
+              <div class="fact"><span>Eval Drop</span><strong id="evalFact">-</strong></div>
+              <div class="fact"><span>Due</span><strong id="dueFact">-</strong></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel side-panel">
+        <section>
+          <h2 class="section-title">Stats</h2>
+          <label class="filter-field">Min eval drop
+            <input id="evalDropFilter" type="number" min="0" step="0.1" placeholder="Any">
+          </label>
+          <div class="stats-grid">
+            <div class="stat"><strong id="totalStat">0</strong><span>Puzzles</span></div>
+            <div class="stat"><strong id="dueStat">0</strong><span>Due</span></div>
+            <div class="stat"><strong id="rightStat">0</strong><span>Correct</span></div>
+            <div class="stat"><strong id="accuracyStat">0%</strong><span>Accuracy</span></div>
+          </div>
+        </section>
+
+        <section class="bars">
+          <h2 class="section-title">Progress</h2>
+          <div class="bar-row"><span>New</span><div class="bar"><div id="newBar" class="bar-fill warn"></div></div><strong id="newCount">0</strong></div>
+          <div class="bar-row"><span>Learning</span><div class="bar"><div id="learningBar" class="bar-fill"></div></div><strong id="learningCount">0</strong></div>
+          <div class="bar-row"><span>Review</span><div class="bar"><div id="reviewBar" class="bar-fill"></div></div><strong id="reviewCount">0</strong></div>
+          <div class="bar-row"><span>Missed</span><div class="bar"><div id="missedBar" class="bar-fill bad"></div></div><strong id="missedCount">0</strong></div>
+        </section>
+
+        <section class="sync-box">
+          <h2 class="section-title">Study Sync</h2>
+          <div id="authState" class="result">Not connected to Lichess.</div>
+          <div class="controls">
+            <button id="loginBtn" class="accent">Connect Lichess</button>
+            <button id="logoutBtn" class="secondary">Disconnect</button>
+          </div>
+          <label>Study ID
+            <input id="studyIdInput" placeholder="Optional existing study">
+          </label>
+          <div class="controls">
+            <button id="exportBtn" class="secondary">Export PGN</button>
+            <button id="syncBtn" class="secondary">Sync All</button>
+          </div>
+        </section>
+
+        <section id="emptyState" class="empty">
+          <strong>No local puzzles yet.</strong>
+          <p class="muted">Use Update after entering a username. Only games with Lichess computer analysis are imported.</p>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const LICHESS = "https://lichess.org";
+    const OAUTH_CLIENT_ID = "local-lichess-tactics-trainer";
+    const OAUTH_SCOPES = "study:write";
+    const DB_NAME = "lichess-tactics-trainer";
+    const DB_VERSION = 1;
+    const PIECE_BASE = "https://lichess1.org/assets/piece/cburnett";
+    const INTERVALS = [0, 1, 3, 7, 14, 30, 60, 120];
+    const BLUNDER_DROP = 180;
+    const MISTAKE_DROP = 90;
+
+    const state = {
+      db: null,
+      username: "",
+      puzzles: [],
+      queue: [],
+      index: 0,
+      puzzle: null,
+      boardGame: new Chess(),
+      selected: null,
+      legalTargets: [],
+      legalCaptures: [],
+      lastMove: [],
+      playedMove: [],
+      dragFrom: null,
+      dragPiece: null,
+      dragGhost: null,
+      suppressClick: false,
+      feedbackTimer: null,
+      feedbackText: "",
+      feedbackClass: "",
+      solvedThisView: false,
+      saveTimer: null
+    };
+
+    const els = {};
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    async function init() {
+      bindElements();
+      state.db = await openDb();
+      await loadSettings();
+      bindEvents();
+      renderBoardFrame();
+      await refreshPuzzles();
+      loadCurrentPuzzle();
+      renderAll();
+    }
+
+    function bindElements() {
+      [
+        "username", "fetchBtn", "fullFetchBtn", "status", "statusProgress", "statusProgressFill", "board", "prevBtn", "nextBtn",
+        "resetBtn", "showBtn", "analysisBtn", "sourceFact", "evalFact", "dueFact", "queueFact",
+        "prompt", "result", "notes", "noteState", "totalStat", "dueStat", "rightStat", "accuracyStat",
+        "newBar", "learningBar", "reviewBar", "missedBar", "newCount", "learningCount",
+        "reviewCount", "missedCount", "emptyState", "authState", "loginBtn", "logoutBtn",
+        "studyIdInput", "exportBtn", "syncBtn", "autoNextToggle", "evalDropFilter"
+      ].forEach(id => els[id] = document.getElementById(id));
+    }
+
+    function bindEvents() {
+      els.fetchBtn.addEventListener("click", () => fetchAnalyzedGames(false));
+      els.fullFetchBtn.addEventListener("click", () => fetchAnalyzedGames(true));
+      els.username.addEventListener("keydown", event => {
+        if (event.key === "Enter") fetchAnalyzedGames(false);
+      });
+      els.prevBtn.addEventListener("click", () => moveQueue(-1));
+      els.nextBtn.addEventListener("click", () => moveQueue(1));
+      els.resetBtn.addEventListener("click", resetPuzzle);
+      els.showBtn.addEventListener("click", showAnswer);
+      els.analysisBtn.addEventListener("click", openAnalysis);
+      els.notes.addEventListener("input", scheduleNoteSave);
+      els.exportBtn.addEventListener("click", exportPgn);
+      els.syncBtn.addEventListener("click", syncCurrentPuzzle);
+      els.loginBtn.addEventListener("click", startLichessLogin);
+      els.logoutBtn.addEventListener("click", disconnectLichess);
+      els.studyIdInput.addEventListener("input", () => saveSetting("studyId", els.studyIdInput.value.trim()));
+      els.autoNextToggle.addEventListener("change", () => saveSetting("autoNext", els.autoNextToggle.checked ? "1" : ""));
+      els.evalDropFilter.addEventListener("input", async () => {
+        await saveSetting("evalDropFilter", els.evalDropFilter.value.trim());
+        state.index = 0;
+        buildQueue();
+        loadCurrentPuzzle();
+        renderAll();
+      });
+    }
+
+    function openDb() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          const puzzles = db.createObjectStore("puzzles", { keyPath: "id" });
+          puzzles.createIndex("username", "username", { unique: false });
+          puzzles.createIndex("dueAt", "dueAt", { unique: false });
+          db.createObjectStore("settings", { keyPath: "key" });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function tx(store, mode = "readonly") {
+      return state.db.transaction(store, mode).objectStore(store);
+    }
+
+    function idbGet(store, key) {
+      return new Promise((resolve, reject) => {
+        const request = tx(store).get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function idbPut(store, value) {
+      return new Promise((resolve, reject) => {
+        const request = tx(store, "readwrite").put(value);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function idbAll(store) {
+      return new Promise((resolve, reject) => {
+        const request = tx(store).getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function saveSetting(key, value) {
+      await idbPut("settings", { key, value });
+    }
+
+    async function loadSettings() {
+      const settings = await idbAll("settings");
+      const map = Object.fromEntries(settings.map(item => [item.key, item.value]));
+      els.username.value = map.username || "";
+      els.studyIdInput.value = map.studyId || "";
+      els.autoNextToggle.checked = map.autoNext === "1";
+      els.evalDropFilter.value = map.evalDropFilter || "";
+      await completeOAuthIfNeeded(map);
+      renderAuthState();
+    }
+
+    async function startLichessLogin() {
+      const verifier = base64Url(crypto.getRandomValues(new Uint8Array(48)));
+      const challenge = await sha256Base64Url(verifier);
+      const oauthState = base64Url(crypto.getRandomValues(new Uint8Array(24)));
+      await saveSetting("oauthVerifier", verifier);
+      await saveSetting("oauthState", oauthState);
+      const params = new URLSearchParams({
+        response_type: "code",
+        client_id: OAUTH_CLIENT_ID,
+        redirect_uri: location.origin + location.pathname,
+        scope: OAUTH_SCOPES,
+        code_challenge_method: "S256",
+        code_challenge: challenge,
+        state: oauthState
+      });
+      location.assign(`${LICHESS}/oauth?${params}`);
+    }
+
+    async function completeOAuthIfNeeded(settings) {
+      const params = new URLSearchParams(location.search);
+      const code = params.get("code");
+      const returnedState = params.get("state");
+      if (!code) return;
+      const verifier = settings.oauthVerifier;
+      const expectedState = settings.oauthState;
+      if (!verifier || !expectedState || returnedState !== expectedState) {
+        setStatus("Lichess sign-in failed: state check did not match.");
+        await saveSetting("oauthVerifier", "");
+        await saveSetting("oauthState", "");
+        history.replaceState(null, "", location.origin + location.pathname);
+        return;
+      }
+      try {
+        setStatus("Completing Lichess sign-in...");
+        const body = new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: verifier,
+          redirect_uri: location.origin + location.pathname,
+          client_id: OAUTH_CLIENT_ID
+        });
+        const response = await fetch(`${LICHESS}/api/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body
+        });
+        if (!response.ok) throw new Error(`token exchange returned ${response.status}`);
+        const token = await response.json();
+        await saveSetting("accessToken", token.access_token);
+        await saveSetting("tokenScope", token.scope || OAUTH_SCOPES);
+        await saveSetting("tokenCreatedAt", Date.now());
+        await saveSetting("oauthVerifier", "");
+        await saveSetting("oauthState", "");
+        setStatus("Connected to Lichess.");
+      } catch (error) {
+        console.error(error);
+        setStatus(`Lichess sign-in failed: ${error.message}`);
+      } finally {
+        history.replaceState(null, "", location.origin + location.pathname);
+      }
+    }
+
+    async function disconnectLichess() {
+      await saveSetting("accessToken", "");
+      await saveSetting("tokenScope", "");
+      await saveSetting("tokenCreatedAt", "");
+      renderAuthState();
+      setStatus("Disconnected from Lichess study sync.");
+    }
+
+    async function getAccessToken() {
+      const item = await idbGet("settings", "accessToken");
+      return item?.value || "";
+    }
+
+    async function renderAuthState() {
+      const token = await getAccessToken();
+      if (token) {
+        els.authState.textContent = "Connected to Lichess with study write access.";
+        els.authState.className = "result good";
+      } else {
+        els.authState.textContent = "Not connected to Lichess.";
+        els.authState.className = "result";
+      }
+      els.logoutBtn.disabled = !token;
+    }
+
+    async function sha256Base64Url(value) {
+      const bytes = new TextEncoder().encode(value);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      return base64Url(new Uint8Array(digest));
+    }
+
+    function base64Url(bytes) {
+      let binary = "";
+      bytes.forEach(byte => binary += String.fromCharCode(byte));
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+
+    async function refreshPuzzles() {
+      state.puzzles = (await idbAll("puzzles")).sort((a, b) => a.dueAt - b.dueAt || b.createdAt - a.createdAt);
+      buildQueue();
+    }
+
+    function buildQueue() {
+      const now = Date.now();
+      const visible = filteredPuzzles();
+      const due = visible.filter(puzzle => puzzle.dueAt <= now);
+      const future = visible.filter(puzzle => puzzle.dueAt > now);
+      state.queue = [...due, ...future].sort((a, b) => a.dueAt - b.dueAt || a.createdAt - b.createdAt);
+      if (state.index >= state.queue.length) state.index = Math.max(0, state.queue.length - 1);
+    }
+
+    function filteredPuzzles() {
+      const minPawns = Number(els.evalDropFilter?.value || 0);
+      const minCentipawns = Number.isFinite(minPawns) && minPawns > 0 ? minPawns * 100 : 0;
+      return state.puzzles.filter(puzzle => Math.abs(puzzle.evalDrop || 0) >= minCentipawns);
+    }
+
+    function loadCurrentPuzzle() {
+      if (state.saveTimer && state.puzzle) {
+        clearTimeout(state.saveTimer);
+        state.saveTimer = null;
+        flushNoteSave(state.puzzle, els.notes.value);
+      }
+      removePromotionPicker();
+      state.puzzle = state.queue[state.index] || null;
+      state.selected = null;
+      state.legalTargets = [];
+      state.legalCaptures = [];
+      state.dragFrom = null;
+      state.dragPiece = null;
+      removeDragGhost();
+      state.lastMove = [];
+      state.playedMove = [];
+      state.feedbackText = "";
+      state.feedbackClass = "";
+      clearBoardGlow();
+      state.solvedThisView = false;
+      if (state.puzzle) {
+        try { state.boardGame = new Chess(state.puzzle.fen); }
+        catch { state.boardGame = new Chess(); }
+        els.notes.value = state.puzzle.notes || "";
+      } else {
+        state.boardGame = new Chess();
+        els.notes.value = "";
+      }
+    }
+
+    async function fetchAnalyzedGames(forceFullRefresh = false) {
+      const username = els.username.value.trim();
+      if (!username) {
+        setStatus("Enter a Lichess username first.");
+        return;
+      }
+      state.username = username;
+      await saveSetting("username", username);
+      els.fetchBtn.disabled = true;
+      els.fullFetchBtn.disabled = true;
+      setStatus(forceFullRefresh ? "Fetching all analyzed games from Lichess..." : "Fetching new analyzed games from Lichess...");
+
+      try {
+        const sinceKey = `lastFetch:${username.toLowerCase()}`;
+        const lastFetch = await idbGet("settings", sinceKey);
+        const since = !forceFullRefresh && lastFetch?.value ? Number(lastFetch.value) + 1 : undefined;
+        const params = new URLSearchParams({
+          analysed: "true",
+          evals: "true",
+          literate: "true",
+          moves: "true",
+          tags: "true",
+          opening: "true",
+          accuracy: "true",
+          sort: "dateAsc"
+        });
+        if (since) params.set("since", String(since));
+        const response = await fetch(`${LICHESS}/api/games/user/${encodeURIComponent(username)}?${params}`, {
+          headers: { Accept: "application/x-ndjson" }
+        });
+        if (!response.ok) throw new Error(`Lichess returned ${response.status}`);
+        const text = await response.text();
+        const games = text.trim()
+          ? text.trim().split("\n").map(line => JSON.parse(line)).filter(game => game.analysis && game.moves)
+          : [];
+        setStatus(`Fetched ${games.length} analyzed game${games.length === 1 ? "" : "s"}. Extracting puzzles...`);
+        let added = 0;
+        const diagnostics = { noUserColor: 0, unparsableMove: 0, noBestMove: 0, noEval: 0, smallDrop: 0, candidates: 0 };
+        let newest = since || 0;
+        setProgress(0, games.length);
+        for (let gi = 0; gi < games.length; gi += 1) {
+          const game = games[gi];
+          newest = Math.max(newest, game.createdAt || 0);
+          const puzzles = extractPuzzles(game, username, diagnostics);
+          for (const puzzle of puzzles) {
+            const existing = await idbGet("puzzles", puzzle.id);
+            if (!existing) {
+              await idbPut("puzzles", puzzle);
+              added += 1;
+            }
+          }
+          setProgress(gi + 1, games.length);
+        }
+        if (newest) await saveSetting(sinceKey, newest);
+        await refreshPuzzles();
+        state.index = 0;
+        loadCurrentPuzzle();
+        renderAll();
+        setStatus(`Added ${added} new puzzle${added === 1 ? "" : "s"} from ${games.length} analyzed game${games.length === 1 ? "" : "s"}. Checked ${diagnostics.candidates} user moves; skipped ${diagnostics.noBestMove} without best move, ${diagnostics.smallDrop} small drops.`);
+      } catch (error) {
+        console.error(error);
+        setStatus(`Fetch failed: ${error.message}`);
+      } finally {
+        els.fetchBtn.disabled = false;
+        els.fullFetchBtn.disabled = false;
+        setTimeout(() => setProgress(), 900);
+      }
+    }
+
+    function extractPuzzles(game, username, diagnostics = null) {
+      const moves = game.moves.trim().split(/\s+/).filter(Boolean);
+      const analysis = game.analysis || [];
+      const result = [];
+      const chess = new Chess();
+      const userLower = username.toLowerCase();
+      const userColor = game.players?.white?.user?.name?.toLowerCase() === userLower ? "w"
+        : game.players?.black?.user?.name?.toLowerCase() === userLower ? "b"
+        : null;
+      if (!userColor) {
+        if (diagnostics) diagnostics.noUserColor += 1;
+        return result;
+      }
+
+      for (let ply = 0; ply < moves.length; ply += 1) {
+        const colorToMove = chess.turn();
+        const fenBefore = chess.fen();
+        const playedSan = moves[ply];
+        const analysisAfter = analysis[ply] || {};
+        const analysisBefore = ply > 0 ? analysis[ply - 1] || {} : { eval: 0 };
+        const played = chess.move(playedSan, { sloppy: true });
+        if (!played) {
+          if (diagnostics) diagnostics.unparsableMove += 1;
+          break;
+        }
+        if (colorToMove !== userColor) continue;
+        if (diagnostics) diagnostics.candidates += 1;
+
+        const bestMove = bestMoveFromAnalysis(fenBefore, analysisAfter);
+        if (!bestMove || bestMove === moveToUci(played)) {
+          if (diagnostics) diagnostics.noBestMove += 1;
+          continue;
+        }
+        const beforeEval = normalizeEval(analysisBefore);
+        const afterEval = normalizeEval(analysisAfter);
+        if (beforeEval == null || afterEval == null) {
+          if (diagnostics) diagnostics.noEval += 1;
+          continue;
+        }
+        const drop = colorToMove === "w" ? beforeEval - afterEval : afterEval - beforeEval;
+        const judgment = (analysisAfter.judgment?.name || "").toLowerCase();
+        const isBlunder = judgment.includes("blunder") || drop >= BLUNDER_DROP;
+        const isMistake = judgment.includes("mistake") || drop >= MISTAKE_DROP;
+        if (!isBlunder && !isMistake) {
+          if (diagnostics) diagnostics.smallDrop += 1;
+          continue;
+        }
+
+        const id = `${game.id}-${ply + 1}-${bestMove}`;
+        const now = Date.now();
+        result.push({
+          id,
+          gameId: game.id,
+          username,
+          fen: fenBefore,
+          ply: ply + 1,
+          side: colorToMove,
+          playedMove: moveToUci(played),
+          playedSan: played.san,
+          bestMove,
+          bestSan: sanFromFen(fenBefore, bestMove),
+          evalBefore: beforeEval,
+          evalAfter: afterEval,
+          evalDrop: Math.round(drop),
+          mistakeType: isBlunder ? "Blunder" : "Mistake",
+          opponent: colorToMove === "w" ? game.players?.black?.user?.name : game.players?.white?.user?.name,
+          opening: game.opening?.name || "",
+          createdAt: now,
+          dueAt: now,
+          intervalIndex: 0,
+          attempts: 0,
+          correctCount: 0,
+          wrongCount: 0,
+          notes: "",
+          notesUpdatedAt: null,
+          lastSeenAt: null,
+          lastSyncedAt: null
+        });
+      }
+      return result;
+    }
+
+    function bestMoveFromAnalysis(fen, analysisItem) {
+      const candidates = [
+        analysisItem?.best,
+        parseBestFromComment(analysisItem?.judgment?.comment)
+      ].filter(Boolean);
+      for (const candidate of candidates) {
+        const uci = moveCandidateToUci(fen, candidate);
+        if (uci) return uci;
+      }
+      return null;
+    }
+
+    function parseBestFromComment(comment) {
+      if (!comment) return null;
+      const match = comment.match(/(?:^|\s)([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|[a-h]x?[a-h][1-8](?:=[QRBN])?[+#]?|[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?[+#]?) was best\b/i);
+      return match ? match[1] : null;
+    }
+
+    function moveCandidateToUci(fen, candidate) {
+      const chess = new Chess(fen);
+      if (/^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(candidate)) {
+        const move = chess.move(parseUci(candidate.toLowerCase()));
+        return move ? moveToUci(move) : null;
+      }
+      const sanMove = chess.move(candidate, { sloppy: true });
+      return sanMove ? moveToUci(sanMove) : null;
+    }
+
+    function moveToUci(move) {
+      return `${move.from}${move.to}${move.promotion || ""}`;
+    }
+
+    function parseUci(uci) {
+      return {
+        from: uci.slice(0, 2),
+        to: uci.slice(2, 4),
+        promotion: uci[4] || undefined
+      };
+    }
+
+    function sanFromFen(fen, uci) {
+      const chess = new Chess(fen);
+      const move = chess.move(parseUci(uci));
+      return move ? move.san : uci;
+    }
+
+    function normalizeEval(item) {
+      if (!item) return null;
+      if (typeof item.eval === "number") return item.eval;
+      if (typeof item.cp === "number") return item.cp;
+      if (typeof item.mate === "number") return item.mate > 0 ? 10000 - item.mate : -10000 - item.mate;
+      return null;
+    }
+
+    function renderBoardFrame() {
+      for (let row = 0; row < 8; row += 1) {
+        for (let col = 0; col < 8; col += 1) {
+          const square = document.createElement("button");
+          square.className = "square";
+          square.type = "button";
+          const coord = document.createElement("span");
+          coord.className = "coord";
+          square.appendChild(coord);
+          square.addEventListener("click", () => handleSquareClick(square.dataset.square));
+          square.addEventListener("pointerdown", event => handlePointerDown(event, square.dataset.square));
+          square.addEventListener("pointermove", event => handlePointerMove(event));
+          square.addEventListener("pointerup", event => handlePointerUp(event));
+          square.addEventListener("pointercancel", clearDrag);
+          els.board.appendChild(square);
+        }
+      }
+    }
+
+    function renderAll() {
+      renderBoard();
+      renderPuzzleDetails();
+      renderStats();
+      renderButtons();
+    }
+
+    function renderBoard(feedback = null) {
+      const checkedKing = state.boardGame.in_check() ? kingSquare(state.boardGame.turn()) : null;
+      [...els.board.children].forEach((squareEl, index) => {
+        const row = Math.floor(index / 8);
+        const col = index % 8;
+        const squareName = squareAt(row, col);
+        const piece = state.boardGame.get(squareName);
+        squareEl.dataset.square = squareName;
+        squareEl.querySelector(".coord").textContent = squareName;
+        squareEl.querySelectorAll(".piece").forEach(pieceEl => pieceEl.remove());
+        squareEl.className = "square";
+        if (isDarkSquare(squareName)) squareEl.classList.add("dark");
+        if (state.selected === squareName) squareEl.classList.add("selected");
+        if (state.legalTargets.includes(squareName)) squareEl.classList.add("legal");
+        if (state.legalCaptures.includes(squareName)) squareEl.classList.add("capture");
+        if (state.lastMove.includes(squareName)) squareEl.classList.add("last");
+        if (state.playedMove.includes(squareName)) squareEl.classList.add("played");
+        if (checkedKing === squareName) squareEl.classList.add("check");
+        if (feedback?.squares?.includes(squareName)) squareEl.classList.add(feedback.good ? "feedback-good" : "feedback-bad");
+        if (piece) {
+          const pieceEl = document.createElement("span");
+          pieceEl.className = "piece";
+          pieceEl.style.backgroundImage = `url("${PIECE_BASE}/${piece.color}${piece.type.toUpperCase()}.svg")`;
+          if (state.dragFrom === squareName) pieceEl.classList.add("dragging-source");
+          squareEl.appendChild(pieceEl);
+        }
+      });
+    }
+
+    function squareAt(row, col) {
+      const files = "abcdefgh";
+      if (state.puzzle?.side === "b") {
+        return `${files[7 - col]}${row + 1}`;
+      }
+      return `${files[col]}${8 - row}`;
+    }
+
+    function isDarkSquare(square) {
+      const fileIndex = square.charCodeAt(0) - 97;
+      const rank = Number(square[1]);
+      return (fileIndex + rank) % 2 === 1;
+    }
+
+    function kingSquare(color) {
+      const files = "abcdefgh";
+      const board = state.boardGame.board();
+      for (let row = 0; row < 8; row += 1) {
+        for (let col = 0; col < 8; col += 1) {
+          const piece = board[row][col];
+          if (piece?.type === "k" && piece.color === color) {
+            return `${files[col]}${8 - row}`;
+          }
+        }
+      }
+      return null;
+    }
+
+    function renderPuzzleDetails() {
+      const puzzle = state.puzzle;
+      if (!puzzle) {
+        els.prompt.textContent = "Fetch analyzed games to create tactics from your mistakes and blunders.";
+        els.result.textContent = "No puzzle loaded.";
+        els.result.className = "result";
+        els.sourceFact.textContent = "-";
+        els.evalFact.textContent = "-";
+        els.dueFact.textContent = "-";
+        els.queueFact.textContent = "0 due";
+        return;
+      }
+      const side = puzzle.side === "w" ? "White" : "Black";
+      els.prompt.textContent = `${side} to move. Find the better move than ${puzzle.playedSan || puzzle.playedMove}.`;
+      if (state.feedbackText) {
+        els.result.textContent = state.feedbackText;
+        els.result.className = `result ${state.feedbackClass}`.trim();
+      } else if (!state.solvedThisView) {
+        els.result.textContent = `${puzzle.mistakeType} from your game${puzzle.opening ? ` in ${puzzle.opening}` : ""}.`;
+        els.result.className = "result";
+      }
+      els.sourceFact.textContent = `${puzzle.gameId}, ply ${puzzle.ply}`;
+      els.evalFact.textContent = formatCp(puzzle.evalDrop);
+      els.dueFact.textContent = formatDue(puzzle.dueAt);
+      const dueCount = filteredPuzzles().filter(p => p.dueAt <= Date.now()).length;
+      els.queueFact.textContent = `${dueCount} due`;
+    }
+
+    function renderStats() {
+      const now = Date.now();
+      const visible = filteredPuzzles();
+      const total = visible.length;
+      const due = visible.filter(p => p.dueAt <= now).length;
+      const correct = visible.reduce((sum, p) => sum + p.correctCount, 0);
+      const wrong = visible.reduce((sum, p) => sum + p.wrongCount, 0);
+      const attempts = correct + wrong;
+      const fresh = visible.filter(p => p.attempts === 0).length;
+      const learning = visible.filter(p => p.attempts > 0 && p.intervalIndex < 3).length;
+      const review = visible.filter(p => p.intervalIndex >= 3).length;
+      const missed = visible.filter(p => p.wrongCount > 0).length;
+      els.totalStat.textContent = total;
+      els.dueStat.textContent = due;
+      els.rightStat.textContent = correct;
+      els.accuracyStat.textContent = attempts ? `${Math.round(correct / attempts * 100)}%` : "0%";
+      setBar("new", fresh, total);
+      setBar("learning", learning, total);
+      setBar("review", review, total);
+      setBar("missed", missed, total);
+      els.emptyState.style.display = state.puzzles.length ? "none" : "block";
+    }
+
+    function setBar(name, count, total) {
+      els[`${name}Count`].textContent = count;
+      els[`${name}Bar`].style.width = total ? `${Math.max(3, Math.round(count / total * 100))}%` : "0";
+    }
+
+    function renderButtons() {
+      const hasPuzzle = Boolean(state.puzzle);
+      els.prevBtn.disabled = !hasPuzzle || state.index <= 0;
+      els.nextBtn.disabled = !hasPuzzle || state.index >= state.queue.length - 1;
+      els.resetBtn.disabled = !hasPuzzle;
+      els.showBtn.disabled = !hasPuzzle;
+      els.analysisBtn.disabled = !hasPuzzle;
+      els.notes.disabled = !hasPuzzle;
+      els.exportBtn.disabled = state.puzzles.length === 0;
+      els.syncBtn.disabled = state.puzzles.length === 0;
+    }
+
+    function handleSquareClick(square) {
+      if (state.suppressClick) {
+        state.suppressClick = false;
+        return;
+      }
+      if (!state.puzzle || state.solvedThisView) return;
+      const piece = state.boardGame.get(square);
+      if (!state.selected) {
+        if (!piece || piece.color !== state.boardGame.turn()) return;
+        selectSquare(square);
+        return;
+      }
+      if (state.selected === square) {
+        clearSelection();
+        return;
+      }
+      if (tryMove(state.selected, square)) {
+        return;
+      } else if (piece && piece.color === state.boardGame.turn()) {
+        selectSquare(square);
+      } else {
+        clearSelection();
+      }
+      renderBoard();
+    }
+
+    function handlePointerDown(event, square) {
+      if (!state.puzzle || state.solvedThisView || event.button !== 0) return;
+      const piece = state.boardGame.get(square);
+      if (!piece || piece.color !== state.boardGame.turn()) return;
+      state.dragFrom = square;
+      state.dragPiece = piece;
+      createDragGhost(piece, event.clientX, event.clientY);
+      selectSquare(square);
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    }
+
+    function handlePointerMove(event) {
+      if (!state.dragFrom || !state.dragGhost) return;
+      moveDragGhost(event.clientX, event.clientY);
+    }
+
+    function handlePointerUp(event) {
+      if (!state.dragFrom) return;
+      const from = state.dragFrom;
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".square");
+      const to = target?.dataset.square;
+      clearDrag();
+      if (!to || to === from) {
+        clearSelection();
+        renderBoard();
+        return;
+      }
+      state.suppressClick = true;
+      if (!tryMove(from, to)) {
+        clearSelection();
+        renderBoard();
+      }
+    }
+
+    function clearDrag() {
+      state.dragFrom = null;
+      state.dragPiece = null;
+      removeDragGhost();
+    }
+
+    function createDragGhost(piece, clientX, clientY) {
+      removeDragGhost();
+      const ghost = document.createElement("span");
+      ghost.className = "drag-ghost";
+      ghost.style.backgroundImage = `url("${PIECE_BASE}/${piece.color}${piece.type.toUpperCase()}.svg")`;
+      document.body.appendChild(ghost);
+      state.dragGhost = ghost;
+      moveDragGhost(clientX, clientY);
+      renderBoard();
+    }
+
+    function moveDragGhost(clientX, clientY) {
+      state.dragGhost.style.left = `${clientX}px`;
+      state.dragGhost.style.top = `${clientY}px`;
+    }
+
+    function removeDragGhost() {
+      state.dragGhost?.remove();
+      state.dragGhost = null;
+    }
+
+    function tryMove(from, to) {
+      if (isPromotion(from, to)) {
+        showPromotionPicker(from, to);
+        return true;
+      }
+      const move = state.boardGame.move({ from, to });
+      if (!move) return false;
+      state.lastMove = [move.from, move.to];
+      clearSelection(false);
+      evaluateMove(move);
+      renderBoard();
+      return true;
+    }
+
+    function isPromotion(from, to) {
+      const piece = state.boardGame.get(from);
+      if (!piece || piece.type !== 'p') return false;
+      return (piece.color === 'w' && to[1] === '8') || (piece.color === 'b' && to[1] === '1');
+    }
+
+    function showPromotionPicker(from, to) {
+      removePromotionPicker();
+      const color = state.boardGame.get(from).color;
+      const overlay = document.createElement('div');
+      overlay.className = 'promo-overlay';
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) {
+          removePromotionPicker();
+          clearSelection();
+          renderBoard();
+        }
+      });
+      const choices = document.createElement('div');
+      choices.className = 'promo-choices';
+      for (const p of ['q', 'r', 'b', 'n']) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'promo-option';
+        btn.style.backgroundImage = `url("${PIECE_BASE}/${color}${p.toUpperCase()}.svg")`;
+        btn.addEventListener('click', () => {
+          removePromotionPicker();
+          const move = state.boardGame.move({ from, to, promotion: p });
+          if (!move) return;
+          state.lastMove = [move.from, move.to];
+          clearSelection(false);
+          evaluateMove(move);
+          renderBoard();
+        });
+        choices.appendChild(btn);
+      }
+      overlay.appendChild(choices);
+      document.querySelector('.board-shell').appendChild(overlay);
+    }
+
+    function removePromotionPicker() {
+      document.querySelector('.promo-overlay')?.remove();
+    }
+
+    function selectSquare(square) {
+      state.selected = square;
+      const moves = state.boardGame.moves({ square, verbose: true });
+      state.legalCaptures = moves.filter(move => move.captured).map(move => move.to);
+      state.legalTargets = moves
+        .filter(move => !move.captured)
+        .map(move => move.to);
+      renderBoard();
+    }
+
+    function clearSelection(shouldRender = true) {
+      state.selected = null;
+      state.legalTargets = [];
+      state.legalCaptures = [];
+      if (shouldRender) renderBoard();
+    }
+
+    async function evaluateMove(move) {
+      const puzzle = state.puzzle;
+      const userMove = `${move.from}${move.to}${move.promotion || ""}`;
+      const correct = userMove === puzzle.bestMove;
+      puzzle.attempts += 1;
+      puzzle.lastSeenAt = Date.now();
+      if (correct) {
+        state.solvedThisView = true;
+        puzzle.correctCount += 1;
+        puzzle.intervalIndex = Math.min(INTERVALS.length - 1, puzzle.intervalIndex + (puzzle.wrongCount ? 1 : 2));
+        puzzle.dueAt = Date.now() + INTERVALS[puzzle.intervalIndex] * 86400000;
+        const played = parseUci(puzzle.playedMove);
+        state.playedMove = [played.from, played.to];
+        state.feedbackText = `Correct. Best move: ${puzzle.bestSan || puzzle.bestMove}. Played in game: ${puzzle.playedSan || puzzle.playedMove}.`;
+        state.feedbackClass = "good";
+        els.result.textContent = state.feedbackText;
+        els.result.className = "result good";
+        renderBoard({ good: true, squares: [move.from, move.to] });
+        pulseBoard(true);
+        if (els.autoNextToggle.checked) {
+          setTimeout(() => {
+            if (state.puzzle?.id !== puzzle.id) return;
+            moveQueue(state.index < state.queue.length - 1 ? 1 : 0);
+          }, 850);
+        }
+      } else {
+        puzzle.wrongCount += 1;
+        puzzle.intervalIndex = 0;
+        puzzle.dueAt = Date.now() + 30 * 60000;
+        state.feedbackText = "Not quite. Try the position again.";
+        state.feedbackClass = "bad";
+        els.result.textContent = state.feedbackText;
+        els.result.className = "result bad";
+        renderBoard({ good: false, squares: [move.from, move.to] });
+        pulseBoard(false);
+        setTimeout(() => {
+          if (state.puzzle?.id !== puzzle.id || state.solvedThisView) return;
+          state.boardGame = new Chess(puzzle.fen);
+          state.selected = null;
+          state.legalTargets = [];
+          state.legalCaptures = [];
+          state.lastMove = [];
+          renderBoard();
+        }, 650);
+      }
+      await idbPut("puzzles", puzzle);
+      await refreshPuzzles();
+      renderPuzzleDetails();
+      renderStats();
+    }
+
+    function pulseBoard(good) {
+      clearBoardGlow();
+      els.board.classList.add(good ? "glow-good" : "glow-bad");
+      state.feedbackTimer = setTimeout(clearBoardGlow, 900);
+    }
+
+    function clearBoardGlow() {
+      clearTimeout(state.feedbackTimer);
+      els.board.classList.remove("glow-good", "glow-bad");
+    }
+
+    async function scheduleNoteSave() {
+      if (!state.puzzle) return;
+      const puzzle = state.puzzle;
+      els.noteState.textContent = "Saving...";
+      clearTimeout(state.saveTimer);
+      state.saveTimer = setTimeout(() => flushNoteSave(puzzle, els.notes.value), 350);
+    }
+
+    async function flushNoteSave(puzzle, noteValue) {
+      puzzle.notes = noteValue;
+      puzzle.notesUpdatedAt = Date.now();
+      await idbPut("puzzles", puzzle);
+      const stored = state.puzzles.find(p => p.id === puzzle.id);
+      if (stored) {
+        stored.notes = puzzle.notes;
+        stored.notesUpdatedAt = puzzle.notesUpdatedAt;
+      }
+      if (state.puzzle?.id === puzzle.id) {
+        els.noteState.textContent = "Autosaved locally";
+      }
+    }
+
+    function moveQueue(delta) {
+      state.index = Math.min(Math.max(0, state.index + delta), state.queue.length - 1);
+      loadCurrentPuzzle();
+      renderAll();
+    }
+
+    function resetPuzzle() {
+      if (!state.puzzle) return;
+      loadCurrentPuzzle();
+      renderAll();
+    }
+
+    function showAnswer() {
+      if (!state.puzzle) return;
+      const puzzle = state.puzzle;
+      const best = parseUci(puzzle.bestMove);
+      const played = parseUci(puzzle.playedMove);
+      state.lastMove = [best.from, best.to];
+      state.playedMove = [played.from, played.to];
+      state.solvedThisView = true;
+      state.feedbackText = `Best move: ${puzzle.bestSan || puzzle.bestMove}. Played in game: ${puzzle.playedSan || puzzle.playedMove}.`;
+      state.feedbackClass = "";
+      els.result.textContent = state.feedbackText;
+      els.result.className = "result";
+      renderBoard({ good: true, squares: state.lastMove });
+    }
+
+    function openAnalysis() {
+      if (!state.puzzle) return;
+      window.open(analysisUrl(state.puzzle), "_blank", "noopener,noreferrer");
+    }
+
+    function analysisUrl(puzzle) {
+      const fen = puzzle.fen.replace(/\s+/g, "_");
+      const color = puzzle.side === "w" ? "white" : "black";
+      return `${LICHESS}/analysis/${fen}?color=${color}`;
+    }
+
+    function formatCp(cp) {
+      if (cp == null) return "-";
+      return `${(cp / 100).toFixed(2)} pawns`;
+    }
+
+    function formatDue(timestamp) {
+      const diff = timestamp - Date.now();
+      if (diff <= 0) return "Now";
+      const minutes = Math.ceil(diff / 60000);
+      if (minutes < 60) return `${minutes}m`;
+      const hours = Math.ceil(minutes / 60);
+      if (hours < 48) return `${hours}h`;
+      return `${Math.ceil(hours / 24)}d`;
+    }
+
+    function setStatus(message) {
+      els.status.textContent = message;
+    }
+
+    function setProgress(current = 0, total = 0) {
+      if (!total) {
+        els.statusProgress.classList.remove("active");
+        els.statusProgressFill.style.width = "0";
+        return;
+      }
+      els.statusProgress.classList.add("active");
+      els.statusProgressFill.style.width = `${Math.min(100, Math.max(0, current / total * 100))}%`;
+    }
+
+    function exportPgn() {
+      const pgn = state.puzzles.map(puzzleToPgn).join("\n\n");
+      const blob = new Blob([pgn], { type: "application/x-chess-pgn" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `lichess-tactics-${Date.now()}.pgn`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function syncCurrentPuzzle() {
+      const token = await getAccessToken();
+      let studyId = els.studyIdInput.value.trim();
+      if (!state.puzzles.length || !token) {
+        setStatus("Connect Lichess first to sync studies.");
+        return;
+      }
+      els.syncBtn.disabled = true;
+      try {
+        if (!studyId) {
+          setStatus("Creating Lichess study...");
+          studyId = await createStudy(token);
+          els.studyIdInput.value = studyId;
+          await saveSetting("studyId", studyId);
+        }
+        let synced = 0;
+        const puzzlesToSync = state.puzzles.filter(puzzle => !puzzle.lastSyncedAt);
+        if (!puzzlesToSync.length) {
+          setStatus(`All ${state.puzzles.length} local puzzle${state.puzzles.length === 1 ? "" : "s"} are already synced to ${studyId ? `https://lichess.org/study/${studyId}` : "Lichess"}.`);
+          return;
+        }
+        setProgress(0, puzzlesToSync.length);
+        for (const puzzle of puzzlesToSync) {
+          setStatus(`Syncing puzzle ${synced + 1} of ${puzzlesToSync.length} to Lichess study...`);
+          setProgress(synced, puzzlesToSync.length);
+          const chapter = await importPuzzleToStudy(token, studyId, puzzle);
+          puzzle.lastSyncedAt = Date.now();
+          puzzle.studyId = studyId;
+          puzzle.chapterId = chapter?.[0]?.id || chapter?.id || puzzle.chapterId || null;
+          await idbPut("puzzles", puzzle);
+          synced += 1;
+          setProgress(synced, puzzlesToSync.length);
+        }
+        await refreshPuzzles();
+        setStatus(`Synced ${synced} puzzle${synced === 1 ? "" : "s"} to https://lichess.org/study/${studyId}`);
+      } catch (error) {
+        console.error(error);
+        setStatus(`Study sync failed: ${error.message}`);
+      } finally {
+        els.syncBtn.disabled = false;
+        renderButtons();
+        renderAuthState();
+        setTimeout(() => setProgress(), 900);
+      }
+    }
+
+    async function createStudy(token) {
+      const body = new URLSearchParams({
+        name: `Tactics Trainer ${new Date().toISOString().slice(0, 10)}`,
+        visibility: "private",
+        computer: "nobody",
+        explorer: "owner",
+        cloneable: "nobody",
+        shareable: "nobody",
+        chat: "nobody",
+        sticky: "false"
+      });
+      const response = await fetch(`${LICHESS}/api/study`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body
+      });
+      if (!response.ok) throw new Error(`create study returned ${response.status}`);
+      const data = await response.json();
+      return data.id;
+    }
+
+    async function importPuzzleToStudy(token, studyId, puzzle) {
+      const body = new URLSearchParams({
+        pgn: puzzleToPgn(puzzle),
+        name: `${puzzle.mistakeType} ${puzzle.gameId} ply ${puzzle.ply}`,
+        orientation: puzzle.side === "w" ? "white" : "black",
+        variant: "standard",
+        mode: "practice"
+      });
+      const response = await fetch(`${LICHESS}/api/study/${studyId}/import-pgn`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body
+      });
+      if (!response.ok) throw new Error(`import PGN returned ${response.status}`);
+      return response.json();
+    }
+
+    function puzzleToPgn(puzzle) {
+      const date = new Date(puzzle.createdAt).toISOString().slice(0, 10).replaceAll("-", ".");
+      const orientation = puzzle.side === "w" ? "white" : "black";
+      const tags = [
+        ["Event", "Lichess Tactics Trainer"],
+        ["Site", `${LICHESS}/${puzzle.gameId}`],
+        ["Date", date],
+        ["Round", "-"],
+        ["White", puzzle.side === "w" ? puzzle.username : puzzle.opponent || "?"],
+        ["Black", puzzle.side === "b" ? puzzle.username : puzzle.opponent || "?"],
+        ["Result", "*"],
+        ["FEN", puzzle.fen],
+        ["SetUp", "1"],
+        ["Orientation", orientation],
+        ["PuzzleId", puzzle.id],
+        ["SourceGame", puzzle.gameId],
+        ["Ply", String(puzzle.ply)],
+        ["MistakeType", puzzle.mistakeType]
+      ].map(([key, value]) => `[${key} "${escapePgn(String(value))}"]`).join("\n");
+      const note = puzzle.notes ? ` { ${escapeComment(puzzle.notes)} }` : "";
+      const best = puzzle.bestSan || puzzle.bestMove;
+      return `${tags}\n\n${puzzle.side === "b" ? "1... " : "1. "}${best}${note} *`;
+    }
+
+    function escapePgn(value) {
+      return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+    }
+
+    function escapeComment(value) {
+      return value.replace(/[{}]/g, "").replace(/\s+/g, " ").trim();
+    }
+  </script>
+</body>
+</html>

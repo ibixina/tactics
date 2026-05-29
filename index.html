@@ -310,7 +310,8 @@
       pointer-events: none;
     }
     .square.last { box-shadow: inset 0 0 0 999px rgba(245, 200, 76, 0.24); }
-    .square.played { box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.22); }
+    .square.played { box-shadow: inset 0 0 0 999px rgba(207, 54, 30, 0.52); }
+    .square.alt-highlight { box-shadow: inset 0 0 0 999px rgba(39, 107, 99, 0.28); }
     .square.feedback-good { box-shadow: inset 0 0 0 999px rgba(38, 115, 77, 0.32); }
     .square.feedback-bad { box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.32); }
     .square.check {
@@ -375,6 +376,53 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.55rem;
+    }
+
+    .alt-moves {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+    }
+
+    .alt-moves-label {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-right: 0.2rem;
+    }
+
+    .alt-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.6rem;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.7);
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: border-color 100ms ease, background 100ms ease;
+      min-height: 0;
+    }
+
+    .alt-chip:hover {
+      border-color: var(--accent);
+      background: rgba(39, 107, 99, 0.08);
+      transform: none;
+    }
+
+    .alt-chip.active {
+      border-color: var(--accent);
+      background: rgba(39, 107, 99, 0.12);
+    }
+
+    .alt-chip .chip-eval {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 600;
     }
 
     .toggle {
@@ -625,6 +673,7 @@
           <div>
             <h2 class="section-title">Puzzle <span id="queueFact" class="muted">0 due</span></h2>
             <p id="prompt" class="muted">Fetch analyzed games to create tactics from your mistakes and blunders.</p>
+            <div id="altMoves" class="alt-moves" style="display:none"></div>
           </div>
           <div id="result" class="result">No puzzle loaded.</div>
           <div>
@@ -733,7 +782,9 @@
       feedbackText: "",
       feedbackClass: "",
       solvedThisView: false,
-      saveTimer: null
+      saveTimer: null,
+      altMoves: [],
+      altHighlight: []
     };
 
     const els = {};
@@ -758,7 +809,7 @@
         "prompt", "result", "notes", "noteState", "totalStat", "dueStat", "rightStat", "accuracyStat",
         "newBar", "learningBar", "reviewBar", "missedBar", "newCount", "learningCount",
         "reviewCount", "missedCount", "emptyState", "authState", "loginBtn", "logoutBtn",
-        "studyIdInput", "exportBtn", "syncBtn", "autoNextToggle", "evalDropFilter"
+        "studyIdInput", "exportBtn", "syncBtn", "autoNextToggle", "evalDropFilter", "altMoves"
       ].forEach(id => els[id] = document.getElementById(id));
     }
 
@@ -982,14 +1033,17 @@
       removeDragGhost();
       state.lastMove = [];
       state.playedMove = [];
+      state.altHighlight = [];
       state.feedbackText = "";
       state.feedbackClass = "";
       clearBoardGlow();
       state.solvedThisView = false;
+      state.altMoves = [];
       if (state.puzzle) {
         try { state.boardGame = new Chess(state.puzzle.fen); }
         catch { state.boardGame = new Chess(); }
         els.notes.value = state.puzzle.notes || "";
+        fetchAlternativeMoves(state.puzzle);
       } else {
         state.boardGame = new Chess();
         els.notes.value = "";
@@ -1159,6 +1213,88 @@
       return null;
     }
 
+    const ALT_MOVE_THRESHOLD_CP = 30;
+
+    async function fetchAlternativeMoves(puzzle) {
+      const puzzleId = puzzle.id;
+      if (puzzle.cachedAlts) {
+        state.altMoves = puzzle.cachedAlts;
+        renderAltMoves();
+        return;
+      }
+      try {
+        const response = await fetch(`${LICHESS}/api/cloud-eval?fen=${encodeURIComponent(puzzle.fen)}&multiPv=5`);
+        if (!response.ok) { renderAltMoves(); return; }
+        const data = await response.json();
+        if (state.puzzle?.id !== puzzleId) return;
+        const pvs = data.pvs || [];
+        if (pvs.length < 2) { renderAltMoves(); return; }
+        const bestCp = pvEvalCp(pvs[0], puzzle.side);
+        const alts = [];
+        for (let i = 1; i < pvs.length; i++) {
+          const cp = pvEvalCp(pvs[i], puzzle.side);
+          if (bestCp != null && cp != null && Math.abs(bestCp - cp) <= ALT_MOVE_THRESHOLD_CP) {
+            const uci = pvs[i].moves.split(' ')[0];
+            const san = sanFromFen(puzzle.fen, uci);
+            if (uci !== puzzle.bestMove) {
+              alts.push({ uci, san, cp });
+            }
+          }
+        }
+        state.altMoves = alts;
+        puzzle.cachedAlts = alts;
+        await idbPut("puzzles", puzzle);
+        renderAltMoves();
+      } catch {
+        renderAltMoves();
+      }
+    }
+
+    function pvEvalCp(pv, side) {
+      if (typeof pv.cp === 'number') return side === 'b' ? -pv.cp : pv.cp;
+      if (typeof pv.mate === 'number') {
+        const raw = pv.mate > 0 ? 10000 - pv.mate : -10000 - pv.mate;
+        return side === 'b' ? -raw : raw;
+      }
+      return null;
+    }
+
+    function renderAltMoves() {
+      const container = els.altMoves;
+      container.innerHTML = '';
+      if (!state.puzzle || state.altMoves.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+      container.style.display = 'flex';
+      const label = document.createElement('span');
+      label.className = 'alt-moves-label';
+      label.textContent = 'Also good:';
+      container.appendChild(label);
+      for (const alt of state.altMoves) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'alt-chip';
+        chip.innerHTML = `${alt.san} <span class="chip-eval">${formatCpShort(alt.cp)}</span>`;
+        chip.addEventListener('mouseenter', () => {
+          const parsed = parseUci(alt.uci);
+          state.altHighlight = [parsed.from, parsed.to];
+          renderBoard();
+        });
+        chip.addEventListener('mouseleave', () => {
+          state.altHighlight = [];
+          renderBoard();
+        });
+        container.appendChild(chip);
+      }
+    }
+
+    function formatCpShort(cp) {
+      if (cp == null) return '';
+      const pawns = cp / 100;
+      return (pawns >= 0 ? '+' : '') + pawns.toFixed(1);
+    }
+
     function parseBestFromComment(comment) {
       if (!comment) return null;
       const match = comment.match(/(?:^|\s)([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|[a-h]x?[a-h][1-8](?:=[QRBN])?[+#]?|[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?[+#]?) was best\b/i);
@@ -1244,6 +1380,7 @@
         if (state.legalCaptures.includes(squareName)) squareEl.classList.add("capture");
         if (state.lastMove.includes(squareName)) squareEl.classList.add("last");
         if (state.playedMove.includes(squareName)) squareEl.classList.add("played");
+        if (state.altHighlight.includes(squareName)) squareEl.classList.add("alt-highlight");
         if (checkedKing === squareName) squareEl.classList.add("check");
         if (feedback?.squares?.includes(squareName)) squareEl.classList.add(feedback.good ? "feedback-good" : "feedback-bad");
         if (piece) {
@@ -1518,7 +1655,7 @@
     async function evaluateMove(move) {
       const puzzle = state.puzzle;
       const userMove = `${move.from}${move.to}${move.promotion || ""}`;
-      const correct = userMove === puzzle.bestMove;
+      const correct = userMove === puzzle.bestMove || state.altMoves.some(a => a.uci === userMove);
       puzzle.attempts += 1;
       puzzle.lastSeenAt = Date.now();
       if (correct) {

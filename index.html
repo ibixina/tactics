@@ -8,20 +8,21 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f1ea;
-      --panel: #fffdfa;
-      --ink: #202124;
-      --muted: #686868;
-      --line: #d8d1c4;
-      --accent: #276b63;
-      --accent-2: #b2483f;
-      --accent-3: #d19b2a;
-      --good: #26734d;
-      --bad: #b33a2f;
-      --board-light: #e6cba2;
-      --board-dark: #b97845;
-      --focus: #f5c84c;
-      --shadow: 0 18px 42px rgba(37, 31, 23, 0.12);
+      --bg: #f7f7f5;
+      --panel: #ffffff;
+      --panel-soft: #fafafa;
+      --ink: #171717;
+      --muted: #6b7280;
+      --line: #e2e2df;
+      --accent: #2563eb;
+      --accent-2: #dc2626;
+      --accent-3: #d97706;
+      --good: #15803d;
+      --bad: #b91c1c;
+      --board-light: #eee9de;
+      --board-dark: #8f9c7c;
+      --focus: #fbbf24;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -30,10 +31,7 @@
     body {
       margin: 0;
       min-height: 100vh;
-      background:
-        linear-gradient(135deg, rgba(39, 107, 99, 0.10), transparent 36%),
-        linear-gradient(315deg, rgba(178, 72, 63, 0.11), transparent 42%),
-        var(--bg);
+      background: var(--bg);
       color: var(--ink);
     }
 
@@ -43,17 +41,17 @@
 
     button {
       border: 1px solid transparent;
-      border-radius: 7px;
+      border-radius: 6px;
       background: var(--ink);
       color: white;
-      padding: 0.68rem 0.9rem;
+      padding: 0.55rem 0.8rem;
       cursor: pointer;
-      font-weight: 700;
-      transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
-      min-height: 42px;
+      font-weight: 650;
+      transition: opacity 120ms ease, background 120ms ease, border-color 120ms ease;
+      min-height: 36px;
     }
 
-    button:hover { transform: translateY(-1px); }
+    button:hover { opacity: 0.9; }
     .square:hover { transform: none; }
     button:disabled { cursor: not-allowed; opacity: 0.48; transform: none; }
 
@@ -68,12 +66,12 @@
 
     input, textarea {
       border: 1px solid var(--line);
-      border-radius: 7px;
-      background: white;
+      border-radius: 6px;
+      background: var(--panel);
       color: var(--ink);
-      padding: 0.7rem 0.78rem;
+      padding: 0.55rem 0.7rem;
       outline: none;
-      min-height: 42px;
+      min-height: 36px;
       width: 100%;
     }
 
@@ -84,7 +82,7 @@
 
     textarea {
       resize: vertical;
-      min-height: 260px;
+      min-height: 180px;
       line-height: 1.45;
     }
 
@@ -97,12 +95,12 @@
 
     .topbar {
       display: grid;
-      grid-template-columns: minmax(200px, 320px) auto auto 1fr;
-      gap: 0.7rem;
+      grid-template-columns: minmax(190px, 250px) minmax(160px, 240px) auto auto minmax(220px, 1fr);
+      gap: 0.55rem;
       align-items: center;
-      padding: 0.9rem 1rem;
+      padding: 0.6rem 0.75rem;
       border-bottom: 1px solid var(--line);
-      background: rgba(255, 253, 250, 0.86);
+      background: rgba(255, 255, 255, 0.92);
       backdrop-filter: blur(12px);
       position: sticky;
       top: 0;
@@ -153,11 +151,10 @@
 
     .layout {
       display: grid;
-      grid-template-columns: minmax(320px, 1fr) 330px;
-      gap: 1rem;
-      padding: 1rem;
-      width: min(1580px, 100%);
-      margin: 0 auto;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+      gap: 0.75rem;
+      padding: 0.75rem;
+      width: 100%;
       height: 100%;
       min-height: 0;
       overflow: hidden;
@@ -165,24 +162,24 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: 320px minmax(300px, 1fr);
-      gap: 1rem;
-      align-items: center;
+      grid-template-columns: minmax(260px, 0.52fr) minmax(440px, 1fr);
+      gap: 0.75rem;
+      align-items: stretch;
       min-height: 0;
     }
 
     .panel {
-      background: rgba(255, 253, 250, 0.92);
+      background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
       box-shadow: var(--shadow);
     }
 
     .board-panel {
-      padding: 1rem;
+      padding: 0.75rem;
       display: grid;
       grid-template-rows: minmax(0, 1fr) auto;
-      gap: 0.75rem;
+      gap: 0.6rem;
       justify-items: center;
       align-items: center;
       min-height: 0;
@@ -191,7 +188,7 @@
 
     .board-shell {
       position: relative;
-      width: min(100%, calc(100vh - 245px), 820px);
+      width: min(100%, calc(100vh - 178px), 900px);
       max-width: 100%;
       max-height: 100%;
       aspect-ratio: 1;
@@ -245,7 +242,7 @@
       border-radius: 7px;
       overflow: hidden;
       border: 1px solid rgba(32, 33, 36, 0.34);
-      box-shadow: 0 12px 28px rgba(51, 34, 18, 0.22), inset 0 0 0 1px rgba(255,255,255,0.15);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
       touch-action: manipulation;
       width: 100%;
       height: 100%;
@@ -327,7 +324,7 @@
       background-position: center;
       background-repeat: no-repeat;
       background-size: contain;
-      filter: drop-shadow(0 2px 1px rgba(0,0,0,0.36));
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.28));
       pointer-events: none;
       transform: translate(-50%, -50%);
     }
@@ -368,14 +365,14 @@
 
     .under-board {
       display: grid;
-      gap: 0.75rem;
-      width: min(100%, calc(100vh - 245px), 820px);
+      gap: 0.55rem;
+      width: min(100%, calc(100vh - 178px), 900px);
     }
 
     .controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.55rem;
+      gap: 0.45rem;
     }
 
     .alt-moves {
@@ -430,11 +427,11 @@
       align-items: center;
       gap: 0.45rem;
       min-height: 42px;
-      padding: 0.55rem 0.72rem;
+      padding: 0.45rem 0.65rem;
       border: 1px solid var(--line);
-      border-radius: 7px;
-      background: rgba(255,255,255,0.62);
-      font-weight: 800;
+      border-radius: 6px;
+      background: var(--panel-soft);
+      font-weight: 700;
       cursor: pointer;
       user-select: none;
     }
@@ -453,9 +450,9 @@
 
     .fact {
       border: 1px solid var(--line);
-      border-radius: 7px;
-      padding: 0.65rem;
-      background: rgba(255,255,255,0.6);
+      border-radius: 6px;
+      padding: 0.55rem 0.6rem;
+      background: var(--panel-soft);
       min-width: 0;
     }
 
@@ -463,7 +460,7 @@
       display: block;
       color: var(--muted);
       font-size: 0.72rem;
-      font-weight: 800;
+      font-weight: 750;
       text-transform: uppercase;
     }
 
@@ -476,9 +473,9 @@
     }
 
     .trainer-panel, .side-panel {
-      padding: 1rem;
+      padding: 0.75rem;
       display: grid;
-      gap: 1rem;
+      gap: 0.75rem;
     }
 
     .trainer-panel {
@@ -505,27 +502,37 @@
       overflow: auto;
     }
 
+    .side-panel section {
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .side-panel section:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
     .section-title {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
       margin: 0;
-      font-size: 1rem;
+      font-size: 0.95rem;
     }
 
     .muted {
       color: var(--muted);
-      font-size: 0.9rem;
+      font-size: 0.86rem;
       line-height: 1.45;
     }
 
     .result {
-      min-height: 46px;
+      min-height: 40px;
       border: 1px solid var(--line);
-      border-radius: 7px;
-      padding: 0.75rem;
-      background: rgba(255,255,255,0.62);
+      border-radius: 6px;
+      padding: 0.62rem;
+      background: var(--panel-soft);
       line-height: 1.4;
     }
 
@@ -540,14 +547,14 @@
 
     .stat {
       border: 1px solid var(--line);
-      border-radius: 7px;
-      padding: 0.8rem;
-      background: rgba(255,255,255,0.62);
+      border-radius: 6px;
+      padding: 0.65rem;
+      background: var(--panel-soft);
     }
 
     .stat strong {
       display: block;
-      font-size: 1.55rem;
+      font-size: 1.35rem;
       line-height: 1.1;
     }
 
@@ -575,9 +582,9 @@
     }
 
     .bar {
-      height: 12px;
+      height: 8px;
       border-radius: 999px;
-      background: #ece6db;
+      background: #eeeeeb;
       overflow: hidden;
     }
 
@@ -594,7 +601,7 @@
 
     .sync-box {
       display: grid;
-      gap: 0.6rem;
+      gap: 0.5rem;
     }
 
     .sync-box label {
@@ -613,17 +620,27 @@
       font-size: 0.78rem;
       font-weight: 800;
       text-transform: uppercase;
-      margin: 0.7rem 0;
+      margin: 0.55rem 0;
     }
 
     .empty {
       border: 1px dashed var(--line);
       border-radius: 8px;
-      padding: 1.2rem;
-      background: rgba(255,255,255,0.46);
+      padding: 0.9rem;
+      background: var(--panel-soft);
     }
 
-    @media (max-width: 1120px) {
+    @media (min-width: 1500px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+      }
+
+      .workspace {
+        grid-template-columns: minmax(280px, 0.46fr) minmax(520px, 1fr);
+      }
+    }
+
+    @media (max-width: 1180px) {
       .layout, .workspace {
         grid-template-columns: 1fr;
         height: auto;
@@ -635,6 +652,17 @@
         overflow: visible;
       }
       .side-panel { order: -1; }
+    }
+
+    @media (max-width: 900px) {
+      .topbar {
+        grid-template-columns: minmax(160px, 1fr) auto auto;
+      }
+
+      .topbar .brand,
+      .topbar .status-wrap {
+        grid-column: 1 / -1;
+      }
     }
 
     @media (max-width: 720px) {
@@ -760,6 +788,13 @@
     const INTERVALS = [0, 1, 3, 7, 14, 30, 60, 120];
     const BLUNDER_DROP = 180;
     const MISTAKE_DROP = 90;
+    const LICHESS_RATE_LIMITS = {
+      default: 1200,
+      games: 2500,
+      cloudEval: 3000,
+      study: 3000,
+      oauth: 1200
+    };
 
     const state = {
       db: null,
@@ -784,7 +819,9 @@
       solvedThisView: false,
       saveTimer: null,
       altMoves: [],
-      altHighlight: []
+      altHighlight: [],
+      apiNextAt: {},
+      apiQueue: {}
     };
 
     const els = {};
@@ -939,7 +976,7 @@
           redirect_uri: location.origin + location.pathname,
           client_id: OAUTH_CLIENT_ID
         });
-        const response = await fetch(`${LICHESS}/api/token`, {
+        const response = await lichessFetch("oauth", `${LICHESS}/api/token`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body
@@ -995,6 +1032,51 @@
       let binary = "";
       bytes.forEach(byte => binary += String.fromCharCode(byte));
       return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+
+    async function lichessFetch(bucket, url, options = {}, retries = 2) {
+      const key = bucket || "default";
+      const previous = state.apiQueue[key] || Promise.resolve();
+      let releaseQueue;
+      state.apiQueue[key] = new Promise(resolve => { releaseQueue = resolve; });
+      await previous.catch(() => {});
+      try {
+        return await lichessFetchWithRetry(key, url, options, retries);
+      } finally {
+        releaseQueue();
+      }
+    }
+
+    async function lichessFetchWithRetry(key, url, options = {}, retries = 2) {
+      await waitForLichessSlot(key);
+      const response = await fetch(url, options);
+      if (response.status !== 429 || retries <= 0) return response;
+
+      const retryAfter = retryAfterMs(response.headers.get("Retry-After"));
+      const waitMs = retryAfter || LICHESS_RATE_LIMITS[key] * 2 || LICHESS_RATE_LIMITS.default * 2;
+      setStatus(`Lichess rate limit reached. Waiting ${Math.ceil(waitMs / 1000)}s before retrying...`);
+      await sleep(waitMs);
+      return lichessFetchWithRetry(key, url, options, retries - 1);
+    }
+
+    async function waitForLichessSlot(bucket) {
+      const now = Date.now();
+      const nextAt = state.apiNextAt[bucket] || 0;
+      const waitMs = Math.max(0, nextAt - now);
+      if (waitMs > 0) await sleep(waitMs);
+      state.apiNextAt[bucket] = Date.now() + (LICHESS_RATE_LIMITS[bucket] || LICHESS_RATE_LIMITS.default);
+    }
+
+    function retryAfterMs(value) {
+      if (!value) return 0;
+      const seconds = Number(value);
+      if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+      const dateMs = Date.parse(value);
+      return Number.isFinite(dateMs) ? Math.max(0, dateMs - Date.now()) : 0;
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async function refreshPuzzles() {
@@ -1077,7 +1159,7 @@
           sort: "dateAsc"
         });
         if (since) params.set("since", String(since));
-        const response = await fetch(`${LICHESS}/api/games/user/${encodeURIComponent(username)}?${params}`, {
+        const response = await lichessFetch("games", `${LICHESS}/api/games/user/${encodeURIComponent(username)}?${params}`, {
           headers: { Accept: "application/x-ndjson" }
         });
         if (!response.ok) throw new Error(`Lichess returned ${response.status}`);
@@ -1223,7 +1305,7 @@
         return;
       }
       try {
-        const response = await fetch(`${LICHESS}/api/cloud-eval?fen=${encodeURIComponent(puzzle.fen)}&multiPv=5`);
+        const response = await lichessFetch("cloudEval", `${LICHESS}/api/cloud-eval?fen=${encodeURIComponent(puzzle.fen)}&multiPv=5`);
         if (!response.ok) { renderAltMoves(); return; }
         const data = await response.json();
         if (state.puzzle?.id !== puzzleId) return;
@@ -1871,7 +1953,7 @@
         chat: "nobody",
         sticky: "false"
       });
-      const response = await fetch(`${LICHESS}/api/study`, {
+      const response = await lichessFetch("study", `${LICHESS}/api/study`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1892,7 +1974,7 @@
         variant: "standard",
         mode: "practice"
       });
-      const response = await fetch(`${LICHESS}/api/study/${studyId}/import-pgn`, {
+      const response = await lichessFetch("study", `${LICHESS}/api/study/${studyId}/import-pgn`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

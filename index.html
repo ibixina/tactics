@@ -95,7 +95,7 @@
 
     .topbar {
       display: grid;
-      grid-template-columns: minmax(190px, 250px) minmax(160px, 240px) auto auto minmax(220px, 1fr);
+      grid-template-columns: minmax(190px, 250px) auto minmax(160px, 240px) auto auto minmax(220px, 1fr);
       gap: 0.55rem;
       align-items: center;
       padding: 0.6rem 0.75rem;
@@ -630,6 +630,9 @@
       background: var(--panel-soft);
     }
 
+    body.mode-replay .train-only { display: none; }
+    body.mode-train .replay-only { display: none; }
+
     @media (min-width: 1500px) {
       .layout {
         grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
@@ -686,6 +689,10 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">Lichess Tactics Trainer</div>
+      <div class="controls" style="gap:0.4rem">
+        <button id="modeTrainBtn" class="accent">Train</button>
+        <button id="modeReplayBtn" class="secondary">Replay</button>
+      </div>
       <input id="username" autocomplete="username" placeholder="Lichess username">
       <button id="fetchBtn" class="accent">Update</button>
       <button id="fullFetchBtn" class="secondary">Full Refresh</button>
@@ -733,7 +740,7 @@
       </section>
 
       <aside class="panel side-panel">
-        <section>
+        <section class="train-only">
           <h2 class="section-title">Stats</h2>
           <label class="filter-field">Min eval drop
             <input id="evalDropFilter" type="number" min="0" step="0.1" placeholder="Any">
@@ -754,7 +761,7 @@
           <div class="bar-row"><span>Missed</span><div class="bar"><div id="missedBar" class="bar-fill bad"></div></div><strong id="missedCount">0</strong></div>
         </section>
 
-        <section class="sync-box">
+        <section class="train-only sync-box">
           <h2 class="section-title">Study Sync</h2>
           <div id="authState" class="result">Not connected to Lichess.</div>
           <div class="controls">
@@ -770,6 +777,20 @@
           </div>
         </section>
 
+        <section id="replaySection" class="replay-only">
+          <h2 class="section-title">Replay</h2>
+          <p class="muted">Import the puzzles you have attempted on Lichess and replay them with spaced repetition. Tracks your success rate and average puzzle rating.</p>
+          <div class="controls">
+            <button id="importReplayBtn" class="accent">Import My Puzzles</button>
+          </div>
+          <div class="stats-grid">
+            <div class="stat"><strong id="replayTotalStat">0</strong><span>Puzzles</span></div>
+            <div class="stat"><strong id="replayAvgRatingStat">0</strong><span>Avg Rating</span></div>
+            <div class="stat"><strong id="replaySolvedStat">0</strong><span>Solved</span></div>
+            <div class="stat"><strong id="replaySuccessStat">0%</strong><span>Success</span></div>
+          </div>
+        </section>
+
         <section id="emptyState" class="empty">
           <strong>No local puzzles yet.</strong>
           <p class="muted">Use Update after entering a username. Only games with Lichess computer analysis are imported.</p>
@@ -781,9 +802,9 @@
   <script>
     const LICHESS = "https://lichess.org";
     const OAUTH_CLIENT_ID = "local-lichess-tactics-trainer";
-    const OAUTH_SCOPES = "study:write";
+    const OAUTH_SCOPES = "study:write puzzle:read";
     const DB_NAME = "lichess-tactics-trainer";
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
     const PIECE_BASE = "https://lichess1.org/assets/piece/cburnett";
     const INTERVALS = [0, 1, 3, 7, 14, 30, 60, 120];
     const BLUNDER_DROP = 180;
@@ -792,6 +813,7 @@
       default: 1200,
       games: 2500,
       cloudEval: 3000,
+      puzzle: 3000,
       study: 3000,
       oauth: 1200
     };
@@ -799,10 +821,15 @@
     const state = {
       db: null,
       username: "",
+      mode: "train",
       puzzles: [],
+      replayPuzzles: [],
       queue: [],
       index: 0,
       puzzle: null,
+      replayIndex: 0,
+      replayLocked: false,
+      replayRevealed: false,
       boardGame: new Chess(),
       selected: null,
       legalTargets: [],
@@ -835,8 +862,7 @@
       bindEvents();
       renderBoardFrame();
       await refreshPuzzles();
-      loadCurrentPuzzle();
-      renderAll();
+      setMode("train");
     }
 
     function bindElements() {
@@ -846,7 +872,9 @@
         "prompt", "result", "notes", "noteState", "totalStat", "dueStat", "rightStat", "accuracyStat",
         "newBar", "learningBar", "reviewBar", "missedBar", "newCount", "learningCount",
         "reviewCount", "missedCount", "emptyState", "authState", "loginBtn", "logoutBtn",
-        "studyIdInput", "exportBtn", "syncBtn", "autoNextToggle", "evalDropFilter", "altMoves"
+        "studyIdInput", "exportBtn", "syncBtn", "autoNextToggle", "evalDropFilter", "altMoves",
+        "modeTrainBtn", "modeReplayBtn", "importReplayBtn", "replaySection",
+        "replayTotalStat", "replayAvgRatingStat", "replaySolvedStat", "replaySuccessStat"
       ].forEach(id => els[id] = document.getElementById(id));
     }
 
@@ -856,6 +884,9 @@
       els.username.addEventListener("keydown", event => {
         if (event.key === "Enter") fetchAnalyzedGames(false);
       });
+      els.modeTrainBtn.addEventListener("click", () => setMode("train"));
+      els.modeReplayBtn.addEventListener("click", () => setMode("replay"));
+      els.importReplayBtn.addEventListener("click", importReplayPuzzles);
       els.prevBtn.addEventListener("click", () => moveQueue(-1));
       els.nextBtn.addEventListener("click", () => moveQueue(1));
       els.resetBtn.addEventListener("click", resetPuzzle);
@@ -877,15 +908,42 @@
       });
     }
 
+    function setMode(mode) {
+      state.mode = mode;
+      document.body.className = mode === "replay" ? "mode-replay" : "mode-train";
+      els.modeTrainBtn.className = mode === "replay" ? "secondary" : "accent";
+      els.modeReplayBtn.className = mode === "replay" ? "accent" : "secondary";
+      state.index = 0;
+      buildQueue();
+      loadCurrentPuzzle();
+      renderAll();
+    }
+
+    function currentStore() {
+      return state.mode === "replay" ? "replayPuzzles" : "puzzles";
+    }
+
+    function currentPuzzleList() {
+      return state.mode === "replay" ? state.replayPuzzles : state.puzzles;
+    }
+
     function openDb() {
       return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
         request.onupgradeneeded = () => {
           const db = request.result;
-          const puzzles = db.createObjectStore("puzzles", { keyPath: "id" });
-          puzzles.createIndex("username", "username", { unique: false });
-          puzzles.createIndex("dueAt", "dueAt", { unique: false });
-          db.createObjectStore("settings", { keyPath: "key" });
+          if (!db.objectStoreNames.contains("puzzles")) {
+            const puzzles = db.createObjectStore("puzzles", { keyPath: "id" });
+            puzzles.createIndex("username", "username", { unique: false });
+            puzzles.createIndex("dueAt", "dueAt", { unique: false });
+          }
+          if (!db.objectStoreNames.contains("replayPuzzles")) {
+            const replay = db.createObjectStore("replayPuzzles", { keyPath: "id" });
+            replay.createIndex("dueAt", "dueAt", { unique: false });
+          }
+          if (!db.objectStoreNames.contains("settings")) {
+            db.createObjectStore("settings", { keyPath: "key" });
+          }
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
@@ -1081,10 +1139,20 @@
 
     async function refreshPuzzles() {
       state.puzzles = (await idbAll("puzzles")).sort((a, b) => a.dueAt - b.dueAt || b.createdAt - a.createdAt);
+      state.replayPuzzles = (await idbAll("replayPuzzles")).sort((a, b) => a.dueAt - b.dueAt || (b.date || 0) - (a.date || 0));
       buildQueue();
     }
 
     function buildQueue() {
+      if (state.mode === "replay") {
+        const now = Date.now();
+        const visible = state.replayPuzzles;
+        const due = visible.filter(puzzle => puzzle.dueAt <= now);
+        const future = visible.filter(puzzle => puzzle.dueAt > now);
+        state.queue = [...due, ...future].sort((a, b) => a.dueAt - b.dueAt || (a.date || 0) - (b.date || 0));
+        if (state.index >= state.queue.length) state.index = Math.max(0, state.queue.length - 1);
+        return;
+      }
       const now = Date.now();
       const visible = filteredPuzzles();
       const due = visible.filter(puzzle => puzzle.dueAt <= now);
@@ -1121,11 +1189,22 @@
       clearBoardGlow();
       state.solvedThisView = false;
       state.altMoves = [];
+      state.replayIndex = 0;
+      state.replayLocked = false;
+      state.replayRevealed = false;
       if (state.puzzle) {
         try { state.boardGame = new Chess(state.puzzle.fen); }
         catch { state.boardGame = new Chess(); }
+        if (state.mode === "replay" && state.puzzle.lastMove) {
+          const lm = parseUci(state.puzzle.lastMove);
+          state.lastMove = [lm.from, lm.to];
+        }
         els.notes.value = state.puzzle.notes || "";
-        fetchAlternativeMoves(state.puzzle);
+        if (state.mode === "replay") {
+          renderAltMoves();
+        } else {
+          fetchAlternativeMoves(state.puzzle);
+        }
       } else {
         state.boardGame = new Chess();
         els.notes.value = "";
@@ -1281,6 +1360,102 @@
         });
       }
       return result;
+    }
+
+    async function importReplayPuzzles() {
+      const token = await getAccessToken();
+      if (!token) {
+        setStatus("Connect to Lichess first to import your puzzles.");
+        return;
+      }
+      els.importReplayBtn.disabled = true;
+      setStatus("Fetching your Lichess puzzle history (this can take a while)...");
+      try {
+        const response = await lichessFetch("puzzle", `${LICHESS}/api/puzzle/activity`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.status === 401) {
+          setStatus("Lichess access denied. Reconnect to grant puzzle access, then try again.");
+          return;
+        }
+        if (!response.ok) throw new Error(`Lichess returned ${response.status}`);
+        if (!response.body) throw new Error("Streaming not supported by this browser.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let count = 0;
+        let imported = 0;
+        setProgress(0, 0);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let newline;
+          while ((newline = buffer.indexOf("\n")) >= 0) {
+            const line = buffer.slice(0, newline).trim();
+            buffer = buffer.slice(newline + 1);
+            if (!line) continue;
+            let entry;
+            try { entry = JSON.parse(line); } catch { continue; }
+            const puzzle = entry.puzzle;
+            if (!puzzle || !puzzle.id || !Array.isArray(puzzle.solution)) continue;
+            await storeReplayPuzzle(puzzle, Boolean(entry.win), entry.date);
+            count += 1;
+            imported += 1;
+            if (imported % 25 === 0) setStatus(`Imported ${imported} puzzle attempt${imported === 1 ? "" : "s"}...`);
+          }
+        }
+        await refreshPuzzles();
+        setMode("replay");
+        setStatus(`Imported ${imported} puzzle attempt${imported === 1 ? "" : "s"} (${state.replayPuzzles.length} unique puzzles). Switch to Replay to train them.`);
+      } catch (error) {
+        console.error(error);
+        setStatus(`Import failed: ${error.message}`);
+      } finally {
+        els.importReplayBtn.disabled = false;
+        setTimeout(() => setProgress(), 900);
+      }
+    }
+
+    async function storeReplayPuzzle(puzzle, win, date) {
+      const id = puzzle.id;
+      const side = puzzle.fen.split(" ")[1] === "b" ? "b" : "w";
+      const dateMs = date ? Date.parse(date) : Date.now();
+      const existing = await idbGet("replayPuzzles", id);
+      if (existing) {
+        existing.originalWin = win;
+        existing.date = dateMs;
+        if (typeof puzzle.rating === "number") existing.rating = puzzle.rating;
+        if (typeof puzzle.plays === "number") existing.plays = puzzle.plays;
+        if (Array.isArray(puzzle.themes)) existing.themes = puzzle.themes;
+        if (Array.isArray(puzzle.solution)) existing.solution = puzzle.solution;
+        if (puzzle.fen) existing.fen = puzzle.fen;
+        if (puzzle.lastMove) existing.lastMove = puzzle.lastMove;
+        await idbPut("replayPuzzles", existing);
+        return;
+      }
+      const now = Date.now();
+      await idbPut("replayPuzzles", {
+        id,
+        rating: typeof puzzle.rating === "number" ? puzzle.rating : 0,
+        themes: Array.isArray(puzzle.themes) ? puzzle.themes : [],
+        fen: puzzle.fen,
+        lastMove: puzzle.lastMove || null,
+        solution: Array.isArray(puzzle.solution) ? puzzle.solution : [],
+        plays: typeof puzzle.plays === "number" ? puzzle.plays : 0,
+        side,
+        originalWin: win,
+        date: dateMs,
+        attempts: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        intervalIndex: 0,
+        dueAt: now,
+        lastSeenAt: null,
+        notes: "",
+        notesUpdatedAt: null
+      });
     }
 
     function bestMoveFromAnalysis(fen, analysisItem) {
@@ -1506,13 +1681,35 @@
     function renderPuzzleDetails() {
       const puzzle = state.puzzle;
       if (!puzzle) {
-        els.prompt.textContent = "Fetch analyzed games to create tactics from your mistakes and blunders.";
+        els.prompt.textContent = state.mode === "replay"
+          ? "Import your Lichess puzzles to start replaying them."
+          : "Fetch analyzed games to create tactics from your mistakes and blunders.";
         els.result.textContent = "No puzzle loaded.";
         els.result.className = "result";
         els.sourceFact.textContent = "-";
         els.evalFact.textContent = "-";
         els.dueFact.textContent = "-";
         els.queueFact.textContent = "0 due";
+        return;
+      }
+      if (state.mode === "replay") {
+        const total = puzzle.solution.length;
+        const userMoves = Math.ceil(total / 2);
+        const current = Math.floor(state.replayIndex / 2) + 1;
+        const themes = (puzzle.themes || []).slice(0, 3).join(", ") || "-";
+        els.prompt.textContent = `Replay puzzle (rating ${puzzle.rating}). Find the solution — move ${Math.min(current, userMoves)} of ${userMoves}.`;
+        if (state.feedbackText) {
+          els.result.textContent = state.feedbackText;
+          els.result.className = `result ${state.feedbackClass}`.trim();
+        } else if (!state.solvedThisView) {
+          els.result.textContent = `Lichess puzzle ${puzzle.id}.${puzzle.originalWin ? " You originally solved this." : " You originally missed this."}`;
+          els.result.className = "result";
+        }
+        els.sourceFact.textContent = `Puzzle ${puzzle.id}`;
+        els.evalFact.textContent = `Rating ${puzzle.rating}`;
+        els.dueFact.textContent = formatDue(puzzle.dueAt);
+        const dueCount = state.replayPuzzles.filter(p => p.dueAt <= Date.now()).length;
+        els.queueFact.textContent = `${dueCount} due`;
         return;
       }
       const side = puzzle.side === "w" ? "White" : "Black";
@@ -1533,6 +1730,30 @@
 
     function renderStats() {
       const now = Date.now();
+      if (state.mode === "replay") {
+        const visible = state.replayPuzzles;
+        const total = visible.length;
+        const avgRating = total ? Math.round(visible.reduce((sum, p) => sum + (p.rating || 0), 0) / total) : 0;
+        const solved = visible.filter(p => p.correctCount > 0).length;
+        const correct = visible.reduce((sum, p) => sum + p.correctCount, 0);
+        const wrong = visible.reduce((sum, p) => sum + p.wrongCount, 0);
+        const attempts = correct + wrong;
+        const due = visible.filter(p => p.dueAt <= now).length;
+        const fresh = visible.filter(p => p.attempts === 0).length;
+        const learning = visible.filter(p => p.attempts > 0 && p.intervalIndex < 3).length;
+        const review = visible.filter(p => p.intervalIndex >= 3).length;
+        const missed = visible.filter(p => p.wrongCount > 0).length;
+        els.replayTotalStat.textContent = total;
+        els.replayAvgRatingStat.textContent = avgRating;
+        els.replaySolvedStat.textContent = solved;
+        els.replaySuccessStat.textContent = attempts ? `${Math.round(correct / attempts * 100)}%` : "0%";
+        setBar("new", fresh, total);
+        setBar("learning", learning, total);
+        setBar("review", review, total);
+        setBar("missed", missed, total);
+        els.emptyState.style.display = total ? "none" : "block";
+        return;
+      }
       const visible = filteredPuzzles();
       const total = visible.length;
       const due = visible.filter(p => p.dueAt <= now).length;
@@ -1567,8 +1788,9 @@
       els.showBtn.disabled = !hasPuzzle;
       els.analysisBtn.disabled = !hasPuzzle;
       els.notes.disabled = !hasPuzzle;
-      els.exportBtn.disabled = state.puzzles.length === 0;
-      els.syncBtn.disabled = state.puzzles.length === 0;
+      const hasAny = state.puzzles.length > 0 || state.replayPuzzles.length > 0;
+      els.exportBtn.disabled = !hasAny;
+      els.syncBtn.disabled = state.mode === "replay" || state.puzzles.length === 0;
     }
 
     function handleSquareClick(square) {
@@ -1577,6 +1799,7 @@
         return;
       }
       if (!state.puzzle || state.solvedThisView) return;
+      if (state.mode === "replay" && state.replayLocked) return;
       const piece = state.boardGame.get(square);
       if (!state.selected) {
         if (!piece || piece.color !== state.boardGame.turn()) return;
@@ -1599,6 +1822,7 @@
 
     function handlePointerDown(event, square) {
       if (!state.puzzle || state.solvedThisView || event.button !== 0) return;
+      if (state.mode === "replay" && state.replayLocked) return;
       const piece = state.boardGame.get(square);
       if (!piece || piece.color !== state.boardGame.turn()) return;
       state.dragFrom = square;
@@ -1668,8 +1892,8 @@
       if (!move) return false;
       state.lastMove = [move.from, move.to];
       clearSelection(false);
-      evaluateMove(move);
-      renderBoard();
+      if (state.mode === "replay") evaluateReplayMove(move);
+      else evaluateMove(move);
       return true;
     }
 
@@ -1698,15 +1922,16 @@
         btn.type = 'button';
         btn.className = 'promo-option';
         btn.style.backgroundImage = `url("${PIECE_BASE}/${color}${p.toUpperCase()}.svg")`;
-        btn.addEventListener('click', () => {
-          removePromotionPicker();
-          const move = state.boardGame.move({ from, to, promotion: p });
-          if (!move) return;
-          state.lastMove = [move.from, move.to];
-          clearSelection(false);
-          evaluateMove(move);
-          renderBoard();
-        });
+         btn.addEventListener('click', () => {
+           removePromotionPicker();
+           const move = state.boardGame.move({ from, to, promotion: p });
+           if (!move) return;
+           state.lastMove = [move.from, move.to];
+           clearSelection(false);
+           if (state.mode === "replay") evaluateReplayMove(move);
+           else evaluateMove(move);
+           renderBoard();
+         });
         choices.appendChild(btn);
       }
       overlay.appendChild(choices);
@@ -1779,7 +2004,7 @@
           renderBoard();
         }, 650);
       }
-      await idbPut("puzzles", puzzle);
+      await idbPut(currentStore(), puzzle);
       await refreshPuzzles();
       renderPuzzleDetails();
       renderStats();
@@ -1796,6 +2021,156 @@
       els.board.classList.remove("glow-good", "glow-bad");
     }
 
+    function replayUciAt(index) {
+      return state.puzzle.solution[index];
+    }
+
+    function evaluateReplayMove(move) {
+      const puzzle = state.puzzle;
+      const sol = puzzle.solution;
+      const idx = state.replayIndex;
+      if (idx >= sol.length) return;
+      const expected = sol[idx];
+      const userUci = `${move.from}${move.to}${move.promotion || ""}`;
+      if (userUci !== expected) {
+        replayFail(move);
+        return;
+      }
+      state.lastMove = [move.from, move.to];
+      renderBoard({ good: true, squares: [move.from, move.to] });
+      pulseBoard(true);
+      const oppIdx = idx + 1;
+      if (oppIdx >= sol.length) {
+        state.replayIndex = sol.length;
+        finishReplay(true);
+        return;
+      }
+      state.replayLocked = true;
+      state.replayIndex = oppIdx + 1;
+      renderPuzzleDetails();
+      setTimeout(() => {
+        if (state.puzzle?.id !== puzzle.id) return;
+        const oppMove = state.boardGame.move(parseUci(sol[oppIdx]));
+        if (oppMove) {
+          state.lastMove = [oppMove.from, oppMove.to];
+        }
+        state.replayLocked = false;
+        renderBoard();
+        if (state.replayIndex >= sol.length) {
+          finishReplay(true);
+        } else {
+          renderPuzzleDetails();
+        }
+      }, 320);
+    }
+
+    function replayFail(move) {
+      const puzzle = state.puzzle;
+      puzzle.attempts += 1;
+      puzzle.wrongCount += 1;
+      puzzle.intervalIndex = 0;
+      puzzle.dueAt = Date.now() + 30 * 60000;
+      puzzle.lastSeenAt = Date.now();
+      state.feedbackText = "Not the solution. Reset and try again.";
+      state.feedbackClass = "bad";
+      els.result.textContent = state.feedbackText;
+      els.result.className = "result bad";
+      renderBoard({ good: false, squares: [move.from, move.to] });
+      pulseBoard(false);
+      setTimeout(() => {
+        if (state.puzzle?.id !== puzzle.id || state.solvedThisView) return;
+        state.boardGame = new Chess(puzzle.fen);
+        if (puzzle.lastMove) {
+          const lm = parseUci(puzzle.lastMove);
+          state.lastMove = [lm.from, lm.to];
+        } else {
+          state.lastMove = [];
+        }
+        state.selected = null;
+        state.legalTargets = [];
+        state.legalCaptures = [];
+        state.replayIndex = 0;
+        state.replayRevealed = false;
+        renderBoard();
+        renderPuzzleDetails();
+      }, 650);
+      persistReplay(puzzle);
+    }
+
+    async function finishReplay(success) {
+      const puzzle = state.puzzle;
+      state.solvedThisView = true;
+      puzzle.attempts += 1;
+      puzzle.lastSeenAt = Date.now();
+      if (success && !state.replayRevealed) {
+        puzzle.correctCount += 1;
+        puzzle.intervalIndex = Math.min(INTERVALS.length - 1, puzzle.intervalIndex + (puzzle.wrongCount ? 1 : 2));
+        puzzle.dueAt = Date.now() + INTERVALS[puzzle.intervalIndex] * 86400000;
+        state.feedbackText = `Solved! Rating ${puzzle.rating}. Solution complete.`;
+        state.feedbackClass = "good";
+      } else {
+        puzzle.wrongCount += 1;
+        puzzle.intervalIndex = 0;
+        puzzle.dueAt = Date.now() + 30 * 60000;
+        state.feedbackText = state.replayRevealed
+          ? `Completed with help. Rating ${puzzle.rating}.`
+          : `Not completed. Rating ${puzzle.rating}.`;
+        state.feedbackClass = "bad";
+      }
+      els.result.textContent = state.feedbackText;
+      els.result.className = `result ${state.feedbackClass}`.trim();
+      renderBoard();
+      await persistReplay(puzzle);
+      if (els.autoNextToggle.checked) {
+        setTimeout(() => {
+          if (state.puzzle?.id !== puzzle.id) return;
+          moveQueue(state.index < state.queue.length - 1 ? 1 : 0);
+        }, 850);
+      }
+    }
+
+    async function persistReplay(puzzle) {
+      await idbPut("replayPuzzles", puzzle);
+      await refreshPuzzles();
+      renderStats();
+      renderButtons();
+    }
+
+    function replayShowAnswer() {
+      if (!state.puzzle || state.solvedThisView) return;
+      const puzzle = state.puzzle;
+      const idx = state.replayIndex;
+      if (idx >= puzzle.solution.length) return;
+      state.replayRevealed = true;
+      const userUci = puzzle.solution[idx];
+      const parsed = parseUci(userUci);
+      const san = sanFromFen(state.boardGame.fen(), userUci);
+      state.lastMove = [parsed.from, parsed.to];
+      state.feedbackText = `Answer: ${san}. ${puzzle.solution.length - idx - 1 > 0 ? "Opponent replies, then continue." : "Puzzle solved."}`;
+      state.feedbackClass = "";
+      els.result.textContent = state.feedbackText;
+      els.result.className = "result";
+      const oppIdx = idx + 1;
+      if (oppIdx < puzzle.solution.length) {
+        state.replayLocked = true;
+        state.replayIndex = oppIdx + 1;
+        renderBoard({ good: true, squares: [parsed.from, parsed.to] });
+        setTimeout(() => {
+          if (state.puzzle?.id !== puzzle.id) return;
+          const oppMove = state.boardGame.move(parseUci(puzzle.solution[oppIdx]));
+          if (oppMove) state.lastMove = [oppMove.from, oppMove.to];
+          state.replayLocked = false;
+          renderBoard();
+          if (state.replayIndex >= puzzle.solution.length) finishReplay(true);
+          else renderPuzzleDetails();
+        }, 320);
+      } else {
+        state.replayIndex = puzzle.solution.length;
+        renderBoard({ good: true, squares: [parsed.from, parsed.to] });
+        finishReplay(true);
+      }
+    }
+
     async function scheduleNoteSave() {
       if (!state.puzzle) return;
       const puzzle = state.puzzle;
@@ -1807,8 +2182,9 @@
     async function flushNoteSave(puzzle, noteValue) {
       puzzle.notes = noteValue;
       puzzle.notesUpdatedAt = Date.now();
-      await idbPut("puzzles", puzzle);
-      const stored = state.puzzles.find(p => p.id === puzzle.id);
+      await idbPut(currentStore(), puzzle);
+      const list = currentPuzzleList();
+      const stored = list.find(p => p.id === puzzle.id);
       if (stored) {
         stored.notes = puzzle.notes;
         stored.notesUpdatedAt = puzzle.notesUpdatedAt;
@@ -1832,6 +2208,10 @@
 
     function showAnswer() {
       if (!state.puzzle) return;
+      if (state.mode === "replay") {
+        replayShowAnswer();
+        return;
+      }
       const puzzle = state.puzzle;
       const best = parseUci(puzzle.bestMove);
       const played = parseUci(puzzle.playedMove);
@@ -1847,6 +2227,10 @@
 
     function openAnalysis() {
       if (!state.puzzle) return;
+      if (state.mode === "replay") {
+        window.open(`${LICHESS}/training/${state.puzzle.id}`, "_blank", "noopener,noreferrer");
+        return;
+      }
       window.open(analysisUrl(state.puzzle), "_blank", "noopener,noreferrer");
     }
 
@@ -1886,17 +2270,30 @@
     }
 
     function exportPgn() {
+      if (state.mode === "replay") {
+        const pgn = state.replayPuzzles.map(replayToPgn).join("\n\n");
+        downloadPgn(pgn, `lichess-replay-${Date.now()}.pgn`);
+        return;
+      }
       const pgn = state.puzzles.map(puzzleToPgn).join("\n\n");
+      downloadPgn(pgn, `lichess-tactics-${Date.now()}.pgn`);
+    }
+
+    function downloadPgn(pgn, filename) {
       const blob = new Blob([pgn], { type: "application/x-chess-pgn" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `lichess-tactics-${Date.now()}.pgn`;
+      link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
     }
 
     async function syncCurrentPuzzle() {
+      if (state.mode === "replay") {
+        setStatus("Study sync is only available in Train mode.");
+        return;
+      }
       const token = await getAccessToken();
       let studyId = els.studyIdInput.value.trim();
       if (!state.puzzles.length || !token) {
@@ -2016,6 +2413,38 @@
 
     function escapeComment(value) {
       return value.replace(/[{}]/g, "").replace(/\s+/g, " ").trim();
+    }
+
+    function replayToPgn(puzzle) {
+      const date = new Date(puzzle.date || puzzle.lastSeenAt || Date.now()).toISOString().slice(0, 10).replaceAll("-", ".");
+      const chess = new Chess(puzzle.fen);
+      let movetext = "";
+      let moveNumber = Math.floor(chess.moveNumber());
+      let ply = 0;
+      for (const uci of puzzle.solution) {
+        const san = sanFromFen(chess.fen(), uci);
+        chess.move(parseUci(uci));
+        if (ply % 2 === 0) movetext += `${moveNumber}. `;
+        else if (chess.turn() === "w") moveNumber += 1;
+        movetext += `${san} `;
+        ply += 1;
+      }
+      const tags = [
+        ["Event", "Lichess Puzzle Replay"],
+        ["Site", `${LICHESS}/training/${puzzle.id}`],
+        ["Date", date],
+        ["Round", "-"],
+        ["White", puzzle.id],
+        ["Black", "Lichess"],
+        ["Result", "*"],
+        ["FEN", puzzle.fen],
+        ["SetUp", "1"],
+        ["PuzzleId", puzzle.id],
+        ["Rating", String(puzzle.rating)],
+        ["OriginalResult", puzzle.originalWin ? "Win" : "Loss"]
+      ].map(([key, value]) => `[${key} "${escapePgn(String(value))}"]`).join("\n");
+      const note = puzzle.notes ? ` { ${escapeComment(puzzle.notes)} }` : "";
+      return `${tags}\n\n${movetext.trim()}${note} *`;
     }
   </script>
 </body>

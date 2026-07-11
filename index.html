@@ -862,6 +862,7 @@
       bindEvents();
       renderBoardFrame();
       await refreshPuzzles();
+      updateImportReplayButton();
       setMode("train");
     }
 
@@ -1368,10 +1369,15 @@
         setStatus("Connect to Lichess first to import your puzzles.");
         return;
       }
+      const cursor = (await idbGet("settings", "lastPuzzleImport"))?.value || 0;
       els.importReplayBtn.disabled = true;
-      setStatus("Fetching your Lichess puzzle history (this can take a while)...");
+      setStatus(cursor
+        ? "Fetching your new Lichess puzzle activity..."
+        : "Fetching your Lichess puzzle history (this can take a while)...");
       try {
-        const response = await lichessFetch("puzzle", `${LICHESS}/api/puzzle/activity`, {
+        let url = `${LICHESS}/api/puzzle/activity`;
+        if (cursor) url += `?since=${cursor}`;
+        const response = await lichessFetch("puzzle", url, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.status === 401) {
@@ -1384,8 +1390,8 @@
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let count = 0;
         let imported = 0;
+        let newest = cursor;
         setProgress(0, 0);
         while (true) {
           const { done, value } = await reader.read();
@@ -1400,15 +1406,20 @@
             try { entry = JSON.parse(line); } catch { continue; }
             const puzzle = entry.puzzle;
             if (!puzzle || !puzzle.id || !Array.isArray(puzzle.solution)) continue;
+            const dateMs = entry.date ? Date.parse(entry.date) : Date.now();
             await storeReplayPuzzle(puzzle, Boolean(entry.win), entry.date);
-            count += 1;
+            if (dateMs > newest) newest = dateMs;
             imported += 1;
-            if (imported % 25 === 0) setStatus(`Imported ${imported} puzzle attempt${imported === 1 ? "" : "s"}...`);
+            if (imported % 25 === 0) setStatus(`Imported ${imported} new puzzle attempt${imported === 1 ? "" : "s"}...`);
           }
         }
+        if (newest > cursor) await saveSetting("lastPuzzleImport", newest);
         await refreshPuzzles();
         setMode("replay");
-        setStatus(`Imported ${imported} puzzle attempt${imported === 1 ? "" : "s"} (${state.replayPuzzles.length} unique puzzles). Switch to Replay to train them.`);
+        updateImportReplayButton();
+        setStatus(imported
+          ? `Imported ${imported} new puzzle attempt${imported === 1 ? "" : "s"} (${state.replayPuzzles.length} unique puzzles).`
+          : `No new puzzles since last import (${state.replayPuzzles.length} unique puzzles).`);
       } catch (error) {
         console.error(error);
         setStatus(`Import failed: ${error.message}`);
@@ -1416,6 +1427,14 @@
         els.importReplayBtn.disabled = false;
         setTimeout(() => setProgress(), 900);
       }
+    }
+
+    function updateImportReplayButton() {
+      idbGet("settings", "lastPuzzleImport").then(item => {
+        els.importReplayBtn.textContent = item?.value
+          ? "Import New Puzzles"
+          : "Import My Puzzles";
+      }).catch(() => {});
     }
 
     async function storeReplayPuzzle(puzzle, win, date) {

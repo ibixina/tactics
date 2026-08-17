@@ -2777,7 +2777,6 @@ var Chess=function(r){var u="b",s="w",l=-1,_="p",A="n",S="b",m="r",y="q",p="k",t
     }
 
     let sfWorker = null;
-    let sfPendingCallback = null;
 
     function getStockfishWorker() {
       if (sfWorker) return sfWorker;
@@ -2785,11 +2784,6 @@ var Chess=function(r){var u="b",s="w",l=-1,_="p",A="n",S="b",m="r",y="q",p="k",t
         'importScripts("https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js");'
       ], { type: "application/javascript" });
       sfWorker = new Worker(URL.createObjectURL(blob));
-      sfWorker.onmessage = (e) => {
-        if (sfPendingCallback && typeof e.data === "string") {
-          sfPendingCallback(e.data);
-        }
-      };
       sfWorker.postMessage("uci");
       sfWorker.postMessage("ucinewgame");
       return sfWorker;
@@ -2798,41 +2792,49 @@ var Chess=function(r){var u="b",s="w",l=-1,_="p",A="n",S="b",m="r",y="q",p="k",t
     function stopStockfish() {
       if (sfWorker) {
         sfWorker.postMessage("stop");
-        sfPendingCallback = null;
       }
     }
 
     function analyzePosition(fen, depth = 10) {
       return new Promise((resolve) => {
         const worker = getStockfishWorker();
+        worker.postMessage("stop");
+
         const sideToMove = fen.split(" ")[1] || "w";
         let bestMove = null;
         let rawCp = 0;
         let rawMate = null;
+        let hasCp = false;
 
-        const handler = (data) => {
+        const handler = (e) => {
+          if (typeof e.data !== "string") return;
+          const data = e.data;
+
           if (data.startsWith("info") && data.includes("score")) {
             const cpMatch = data.match(/score cp (-?\d+)/);
             const mateMatch = data.match(/score mate (-?\d+)/);
             if (cpMatch) {
               rawCp = parseInt(cpMatch[1], 10);
               rawMate = null;
+              hasCp = true;
             } else if (mateMatch) {
               rawMate = parseInt(mateMatch[1], 10);
+              hasCp = true;
             }
           }
+
           if (data.startsWith("bestmove")) {
+            worker.removeEventListener("message", handler);
             const parts = data.split(" ");
-            bestMove = parts[1] !== "(none)" ? parts[1] : null;
-            sfPendingCallback = null;
+            bestMove = parts[1] && parts[1] !== "(none)" ? parts[1] : null;
 
             const cp = sideToMove === "b" ? -rawCp : rawCp;
             const mate = rawMate != null ? (sideToMove === "b" ? -rawMate : rawMate) : null;
-            resolve({ bestMove, cp, mate, rawCp, rawMate });
+            resolve({ bestMove, cp, mate, rawCp, rawMate, hasCp });
           }
         };
 
-        sfPendingCallback = handler;
+        worker.addEventListener("message", handler);
         worker.postMessage("position fen " + fen);
         worker.postMessage("go depth " + depth);
       });
@@ -2841,21 +2843,26 @@ var Chess=function(r){var u="b",s="w",l=-1,_="p",A="n",S="b",m="r",y="q",p="k",t
     function getComputerMove(fen, level = 3) {
       return new Promise((resolve) => {
         const worker = getStockfishWorker();
+        worker.postMessage("stop");
+
         const skillMap = [0, 2, 5, 8, 11, 14, 17, 20];
         const skill = skillMap[Math.min(Math.max(1, level), 8) - 1];
         const depthMap = [2, 4, 6, 8, 10, 12, 14, 16];
         const depth = depthMap[Math.min(Math.max(1, level), 8) - 1];
 
-        const handler = (data) => {
+        const handler = (e) => {
+          if (typeof e.data !== "string") return;
+          const data = e.data;
+
           if (data.startsWith("bestmove")) {
+            worker.removeEventListener("message", handler);
             const parts = data.split(" ");
-            const bestMove = parts[1] !== "(none)" ? parts[1] : null;
-            sfPendingCallback = null;
+            const bestMove = parts[1] && parts[1] !== "(none)" ? parts[1] : null;
             resolve(bestMove);
           }
         };
 
-        sfPendingCallback = handler;
+        worker.addEventListener("message", handler);
         worker.postMessage("setoption name Skill Level value " + skill);
         worker.postMessage("position fen " + fen);
         worker.postMessage("go depth " + depth);

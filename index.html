@@ -188,12 +188,13 @@
 
     .board-shell {
       position: relative;
-      width: min(100%, calc(100vh - 178px), 900px);
+      width: min(100%, calc(100vh - 200px), 900px);
       max-width: 100%;
       max-height: 100%;
       display: flex;
       gap: 8px;
-      align-items: stretch;
+      align-items: center;
+      justify-content: center;
     }
 
     .promo-overlay {
@@ -246,20 +247,30 @@
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
       touch-action: manipulation;
       flex: 1;
-      aspect-ratio: 1;
+      aspect-ratio: 1 / 1;
+      width: 100%;
+      max-height: 100%;
       transition: box-shadow 160ms ease;
     }
 
-    .board.glow-warn {
-      box-shadow: 0 0 0 5px rgba(217, 119, 6, 0.25), 0 0 28px rgba(217, 119, 6, 0.8), 0 12px 28px rgba(51, 34, 18, 0.22);
+    .board.glow-best {
+      box-shadow: 0 0 0 5px rgba(21, 128, 61, 0.3), 0 0 28px rgba(21, 128, 61, 0.85);
     }
 
     .board.glow-good {
-      box-shadow: 0 0 0 5px rgba(38, 115, 77, 0.25), 0 0 28px rgba(38, 115, 77, 0.8), 0 12px 28px rgba(51, 34, 18, 0.22);
+      box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.3), 0 0 28px rgba(37, 99, 235, 0.85);
     }
 
-    .board.glow-bad {
-      box-shadow: 0 0 0 5px rgba(179, 58, 47, 0.25), 0 0 28px rgba(179, 58, 47, 0.8), 0 12px 28px rgba(51, 34, 18, 0.22);
+    .board.glow-inaccuracy, .board.glow-warn {
+      box-shadow: 0 0 0 5px rgba(217, 119, 6, 0.3), 0 0 28px rgba(217, 119, 6, 0.85);
+    }
+
+    .board.glow-mistake {
+      box-shadow: 0 0 0 5px rgba(234, 88, 12, 0.3), 0 0 28px rgba(234, 88, 12, 0.85);
+    }
+
+    .board.glow-blunder, .board.glow-bad {
+      box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.3), 0 0 28px rgba(220, 38, 38, 0.85);
     }
 
     .square {
@@ -314,9 +325,11 @@
     .square.last { box-shadow: inset 0 0 0 999px rgba(245, 200, 76, 0.24); }
     .square.played { box-shadow: inset 0 0 0 999px rgba(207, 54, 30, 0.52); }
     .square.alt-highlight { box-shadow: inset 0 0 0 999px rgba(39, 107, 99, 0.28); }
-    .square.feedback-good { box-shadow: inset 0 0 0 999px rgba(38, 115, 77, 0.32); }
-    .square.feedback-bad { box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.32); }
-    .square.feedback-warn { box-shadow: inset 0 0 0 999px rgba(217, 119, 6, 0.32); }
+    .square.feedback-best { box-shadow: inset 0 0 0 999px rgba(21, 128, 61, 0.38); }
+    .square.feedback-good { box-shadow: inset 0 0 0 999px rgba(37, 99, 235, 0.38); }
+    .square.feedback-inaccuracy, .square.feedback-warn { box-shadow: inset 0 0 0 999px rgba(217, 119, 6, 0.38); }
+    .square.feedback-mistake { box-shadow: inset 0 0 0 999px rgba(234, 88, 12, 0.38); }
+    .square.feedback-blunder, .square.feedback-bad { box-shadow: inset 0 0 0 999px rgba(220, 38, 38, 0.38); }
     .square.check {
       box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.42);
     }
@@ -638,13 +651,14 @@
 
     body.mode-replay .train-only, body.mode-replay .practice-only { display: none !important; }
     body.mode-train .replay-only, body.mode-train .practice-only { display: none !important; }
-    body.mode-practice .train-only, body.mode-practice .replay-only, body.mode-practice .train-replay-only { display: none !important; }
+    body.mode-practice .train-only, body.mode-practice .replay-only, body.mode-practice .train-replay-only, body.mode-practice .bars, body.mode-practice .empty, body.mode-practice .topbar-fetch, body.mode-practice .notes-section, body.mode-practice .facts { display: none !important; }
     body:not(.mode-practice) .practice-only { display: none !important; }
     body.mode-practice .eval-bar { display: flex !important; }
     body:not(.mode-practice) .eval-bar { display: none !important; }
 
     .eval-bar {
       width: 26px;
+      align-self: stretch;
       background: #262421;
       border-radius: 6px;
       position: relative;
@@ -805,25 +819,24 @@
         <button id="modeTrainBtn" class="accent">Train</button>
         <button id="modeReplayBtn" class="secondary">Replay</button>
         <button id="modePracticeBtn" class="secondary">Practice</button>
-      <input id="username" autocomplete="username" placeholder="Lichess username">
-      <button id="fetchBtn" class="accent">Update</button>
-      <button id="fullFetchBtn" class="secondary">Full Refresh</button>
-      <div class="status-wrap">
+      <input id="username" class="topbar-fetch" autocomplete="username" placeholder="Lichess username">
+      <button id="fetchBtn" class="accent topbar-fetch">Update</button>
+      <button id="fullFetchBtn" class="secondary topbar-fetch">Full Refresh</button>
+      <div class="status-wrap topbar-fetch">
         <div id="status" class="status">Enter a username to fetch analyzed games.</div>
         <div id="statusProgress" class="status-progress"><div id="statusProgressFill" class="status-progress-fill"></div></div>
       </div>
-    </header>
 
     <main class="layout">
       <section class="workspace">
         <div class="panel trainer-panel">
           <div>
-            <h2 class="section-title">Puzzle <span id="queueFact" class="muted">0 due</span></h2>
+            <h2 class="section-title"><span id="trainerHeader">Puzzle</span> <span id="queueFact" class="muted train-replay-only">0 due</span></h2>
             <p id="prompt" class="muted">Fetch analyzed games to create tactics from your mistakes and blunders.</p>
             <div id="altMoves" class="alt-moves" style="display:none"></div>
           </div>
           <div id="result" class="result">No puzzle loaded.</div>
-          <div>
+          <div class="notes-section train-replay-only">
             <h2 class="section-title">Notes <span id="noteState" class="muted">Autosaved locally</span></h2>
             <textarea id="notes" placeholder="Store your calculation, missed motif, or review note for this puzzle."></textarea>
           </div>
@@ -847,6 +860,7 @@
               <label class="toggle train-replay-only"><input id="autoNextToggle" type="checkbox"> Auto-next</label>
 
               <button id="undoBtn" class="secondary practice-only">Undo Move</button>
+              <button id="redoBtn" class="secondary practice-only">Redo Move</button>
               <button id="restartPracticeBtn" class="secondary practice-only">Restart Game</button>
               <button id="newPracticeUnderBtn" class="accent practice-only">New Game</button>
             </div>
@@ -1018,14 +1032,12 @@
 
     const els = {};
 
-    document.addEventListener("DOMContentLoaded", init);
-
     async function init() {
       bindElements();
+      renderBoardFrame();
       state.db = await openDb();
       await loadSettings();
       bindEvents();
-      renderBoardFrame();
       await refreshPuzzles();
       updateImportReplayButton();
       setMode("train");
@@ -1041,7 +1053,7 @@
         "studyIdInput", "exportBtn", "syncBtn", "autoNextToggle", "evalDropFilter", "altMoves",
         "modeTrainBtn", "modeReplayBtn", "importReplayBtn", "replaySection",
         "replayTotalStat", "replayAvgRatingStat", "replaySolvedStat", "replaySuccessStat",
-        "modePracticeBtn", "evalBar", "evalFill", "evalText", "undoBtn", "restartPracticeBtn",
+        "modePracticeBtn", "evalBar", "evalFill", "evalText", "undoBtn", "redoBtn", "restartPracticeBtn",
         "newPracticeUnderBtn", "sideWhiteBtn", "sideRandomBtn", "sideBlackBtn",
         "practiceLevelSelect", "startPracticeBtn", "practiceMoveLog", "practiceSection"
       ].forEach(id => els[id] = document.getElementById(id));
@@ -1067,6 +1079,7 @@
       els.newPracticeUnderBtn.addEventListener("click", startNewPracticeGame);
       els.restartPracticeBtn.addEventListener("click", restartPracticeGame);
       els.undoBtn.addEventListener("click", undoPracticeMove);
+      els.redoBtn.addEventListener("click", redoPracticeMove);
       els.importReplayBtn.addEventListener("click", importReplayPuzzles);
       els.nextBtn.addEventListener("click", () => moveQueue(1));
       els.resetBtn.addEventListener("click", resetPuzzle);
@@ -1085,6 +1098,24 @@
         buildQueue();
         loadCurrentPuzzle();
         renderAll();
+      });
+      document.addEventListener("keydown", event => {
+        if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          if (state.mode === "practice") {
+            undoPracticeMove();
+          } else {
+            moveQueue(-1);
+          }
+        } else if (event.key === "ArrowRight") {
+          event.preventDefault();
+          if (state.mode === "practice") {
+            redoPracticeMove();
+          } else {
+            moveQueue(1);
+          }
+        }
       });
     }
 
@@ -1799,8 +1830,37 @@
       if (typeof item.mate === "number") return item.mate > 0 ? 10000 - item.mate : -10000 - item.mate;
       return null;
     }
+    function clearDrag() {
+      state.dragFrom = null;
+      state.dragPiece = null;
+      state.isDragging = false;
+      removeDragGhost();
+    }
+
+    function createDragGhost(piece, clientX, clientY) {
+      removeDragGhost();
+      const ghost = document.createElement("span");
+      ghost.className = "drag-ghost";
+      ghost.style.backgroundImage = `url("${PIECE_BASE}/${piece.color}${piece.type.toUpperCase()}.svg")`;
+      document.body.appendChild(ghost);
+      state.dragGhost = ghost;
+      moveDragGhost(clientX, clientY);
+    }
+
+    function moveDragGhost(clientX, clientY) {
+      if (state.dragGhost) {
+        state.dragGhost.style.left = `${clientX}px`;
+        state.dragGhost.style.top = `${clientY}px`;
+      }
+    }
+
+    function removeDragGhost() {
+      state.dragGhost?.remove();
+      state.dragGhost = null;
+    }
 
     function renderBoardFrame() {
+      els.board.innerHTML = "";
       for (let row = 0; row < 8; row += 1) {
         for (let col = 0; col < 8; col += 1) {
           const square = document.createElement("button");
@@ -1817,6 +1877,7 @@
           els.board.appendChild(square);
         }
       }
+      renderBoard();
     }
 
     function renderAll() {
@@ -1849,7 +1910,13 @@
         if (state.playedMove.includes(squareName)) squareEl.classList.add("played");
         if (state.altHighlight.includes(squareName)) squareEl.classList.add("alt-highlight");
         if (checkedKing === squareName) squareEl.classList.add("check");
-        if (feedback?.squares?.includes(squareName)) squareEl.classList.add(feedback.good ? "feedback-good" : "feedback-bad");
+        if (feedback?.squares?.includes(squareName)) {
+          if (feedback.category) {
+            squareEl.classList.add(`feedback-${feedback.category}`);
+          } else {
+            squareEl.classList.add(feedback.good ? "feedback-good" : "feedback-bad");
+          }
+        }
         if (piece) {
           const pieceEl = document.createElement("span");
           pieceEl.className = "piece";
@@ -1895,6 +1962,8 @@
     }
 
     function renderPuzzleDetails() {
+      const hdr = document.getElementById("trainerHeader");
+      if (hdr) hdr.textContent = "Puzzle";
       const puzzle = state.puzzle;
       if (!puzzle) {
         els.prompt.textContent = state.mode === "replay"
@@ -1983,26 +2052,25 @@
       els.totalStat.textContent = total;
       els.dueStat.textContent = due;
       els.rightStat.textContent = correct;
-         btn.addEventListener('click', () => {
-           removePromotionPicker();
-           const move = state.boardGame.move({ from, to, promotion: p });
-           if (!move) return;
-           state.lastMove = [move.from, move.to];
-           clearSelection(false);
-           if (state.mode === "practice") evaluatePracticeUserMove(move);
-           else if (state.mode === "replay") evaluateReplayMove(move);
-           else evaluateMove(move);
-           renderBoard();
-         });
+      els.accuracyStat.textContent = attempts ? `${Math.round(correct / attempts * 100)}%` : "0%";
+      setBar("new", fresh, total);
+      setBar("learning", learning, total);
+      setBar("review", review, total);
+      setBar("missed", missed, total);
+      els.emptyState.style.display = state.puzzles.length ? "none" : "block";
+    }
+
+    function setBar(name, count, total) {
       els[`${name}Count`].textContent = count;
       els[`${name}Bar`].style.width = total ? `${Math.max(3, Math.round(count / total * 100))}%` : "0";
     }
 
     function renderButtons() {
       if (state.mode === "practice") {
-        els.undoBtn.disabled = !state.practice.gameActive || state.practice.history.length === 0 || state.practice.isThinking;
-        els.restartPracticeBtn.disabled = !state.practice.gameActive || state.practice.isThinking;
-        els.newPracticeUnderBtn.disabled = state.practice.isThinking;
+        if (els.undoBtn) els.undoBtn.disabled = !state.practice.gameActive || state.practice.history.length === 0 || state.practice.isThinking;
+        if (els.redoBtn) els.redoBtn.disabled = !state.practice.gameActive || !state.practice.redoStack || state.practice.redoStack.length === 0 || state.practice.isThinking;
+        if (els.restartPracticeBtn) els.restartPracticeBtn.disabled = !state.practice.gameActive || state.practice.isThinking;
+        if (els.newPracticeUnderBtn) els.newPracticeUnderBtn.disabled = state.practice.isThinking;
         return;
       }
       const hasPuzzle = Boolean(state.puzzle);
@@ -2050,48 +2118,56 @@
     }
 
     function handlePointerDown(event, square) {
+      if (event.button !== 0) return;
       if (state.mode === "practice") {
-        if (state.practice.isThinking || !state.practice.gameActive || state.boardGame.game_over() || event.button !== 0) return;
+        if (state.practice.isThinking || !state.practice.gameActive || state.boardGame.game_over()) return;
+        if (state.boardGame.turn() !== state.practice.playerColor) return;
       } else {
-        if (!state.puzzle || state.solvedThisView || event.button !== 0) return;
+        if (!state.puzzle || state.solvedThisView) return;
         if (state.mode === "replay" && state.replayLocked) return;
       }
       const piece = state.boardGame.get(square);
+      if (!piece || piece.color !== state.boardGame.turn()) return;
       state.dragFrom = square;
       state.dragPiece = piece;
-      createDragGhost(piece, event.clientX, event.clientY);
-      selectSquare(square);
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-      event.preventDefault();
+      state.dragStartPos = { x: event.clientX, y: event.clientY };
+      state.isDragging = false;
     }
 
     function handlePointerMove(event) {
-      if (!state.dragFrom || !state.dragGhost) return;
-      moveDragGhost(event.clientX, event.clientY);
+      if (!state.dragFrom || !state.dragPiece) return;
+      const dx = event.clientX - (state.dragStartPos?.x || 0);
+      const dy = event.clientY - (state.dragStartPos?.y || 0);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (!state.isDragging && dist > 5) {
+        state.isDragging = true;
+        selectSquare(state.dragFrom);
+        createDragGhost(state.dragPiece, event.clientX, event.clientY);
+      }
+      if (state.isDragging && state.dragGhost) {
+        moveDragGhost(event.clientX, event.clientY);
+      }
     }
 
     function handlePointerUp(event) {
       if (!state.dragFrom) return;
       const from = state.dragFrom;
-      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".square");
-      const to = target?.dataset.square;
+      const isDragging = state.isDragging;
       clearDrag();
-      if (!to || to === from) {
-        clearSelection();
-        renderBoard();
-        return;
+      if (isDragging) {
+        const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".square");
+        const to = target?.dataset.square;
+        state.suppressClick = true;
+        if (to && to !== from) {
+          if (!tryMove(from, to)) {
+            clearSelection();
+            renderBoard();
+          }
+        } else {
+          clearSelection();
+          renderBoard();
+        }
       }
-      state.suppressClick = true;
-      if (!tryMove(from, to)) {
-        clearSelection();
-        renderBoard();
-      }
-    }
-
-    function clearDrag() {
-      state.dragFrom = null;
-      state.dragPiece = null;
-      removeDragGhost();
     }
 
     function createDragGhost(piece, clientX, clientY) {
@@ -2254,7 +2330,7 @@
 
     function clearBoardGlow() {
       clearTimeout(state.feedbackTimer);
-      els.board.classList.remove("glow-good", "glow-bad");
+      els.board.classList.remove("glow-best", "glow-good", "glow-inaccuracy", "glow-mistake", "glow-blunder", "glow-warn", "glow-bad");
     }
 
     function replayUciAt(index) {
@@ -2712,26 +2788,30 @@
     function analyzePosition(fen, depth = 10) {
       return new Promise((resolve) => {
         const worker = getStockfishWorker();
+        const sideToMove = fen.split(" ")[1] || "w";
         let bestMove = null;
-        let evalCp = 0;
-        let mate = null;
+        let rawCp = 0;
+        let rawMate = null;
 
         const handler = (data) => {
           if (data.startsWith("info") && data.includes("score")) {
             const cpMatch = data.match(/score cp (-?\d+)/);
             const mateMatch = data.match(/score mate (-?\d+)/);
             if (cpMatch) {
-              evalCp = parseInt(cpMatch[1], 10);
-              mate = null;
+              rawCp = parseInt(cpMatch[1], 10);
+              rawMate = null;
             } else if (mateMatch) {
-              mate = parseInt(mateMatch[1], 10);
+              rawMate = parseInt(mateMatch[1], 10);
             }
           }
           if (data.startsWith("bestmove")) {
             const parts = data.split(" ");
             bestMove = parts[1] !== "(none)" ? parts[1] : null;
             sfPendingCallback = null;
-            resolve({ bestMove, cp: evalCp, mate });
+
+            const cp = sideToMove === "b" ? -rawCp : rawCp;
+            const mate = rawMate != null ? (sideToMove === "b" ? -rawMate : rawMate) : null;
+            resolve({ bestMove, cp, mate, rawCp, rawMate });
           }
         };
 
@@ -2861,22 +2941,35 @@
       let evalDrop = 0;
       let category = "best";
       let evalAfter = evalBefore;
+      let mateAfter = analysisBefore.mate;
 
       if (bestUci && userUci === bestUci) {
         category = "best";
         evalDrop = 0;
+        const fenAfter = state.boardGame.fen();
+        const analysisAfter = await analyzePosition(fenAfter, 10);
+        evalAfter = analysisAfter.cp;
+        mateAfter = analysisAfter.mate;
       } else {
         const fenAfter = state.boardGame.fen();
         const analysisAfter = await analyzePosition(fenAfter, 10);
         evalAfter = analysisAfter.cp;
+        mateAfter = analysisAfter.mate;
 
         const evalAfterUser = userColor === "w" ? evalAfter : -evalAfter;
         evalDrop = Math.max(0, evalBeforeUser - evalAfterUser);
 
-        if (evalDrop <= 10) category = "best";
-        else if (evalDrop <= 50) category = "good";
-        else if (evalDrop <= 120) category = "inaccuracy";
-        else if (evalDrop <= 300) category = "mistake";
+        if (analysisBefore.mate != null) {
+          const mateBeforeUser = userColor === "w" ? analysisBefore.mate : -analysisBefore.mate;
+          const mateAfterUser = mateAfter != null ? (userColor === "w" ? mateAfter : -mateAfter) : null;
+          if (mateBeforeUser > 0 && (mateAfterUser == null || mateAfterUser <= 0)) {
+            evalDrop = 1000;
+          }
+        }
+
+        if (evalDrop <= 30) category = "good";
+        else if (evalDrop <= 90) category = "inaccuracy";
+        else if (evalDrop <= 250) category = "mistake";
         else category = "blunder";
       }
 
@@ -2907,12 +3000,12 @@
 
       pulseBoardCategory(category);
       renderBoard({
-        good: category === "best" || category === "good",
-        warn: category === "inaccuracy",
+        category,
+        good: category === "best",
         squares: [move.from, move.to]
       });
 
-      updateAnalysisBar(evalAfter, analysisBefore.mate);
+      updateAnalysisBar(evalAfter, mateAfter);
       renderPracticeDetails();
 
       if (state.boardGame.game_over()) {
@@ -2925,10 +3018,8 @@
 
     function pulseBoardCategory(category) {
       clearBoardGlow();
-      if (category === "best" || category === "good") els.board.classList.add("glow-good");
-      else if (category === "inaccuracy") els.board.classList.add("glow-warn");
-      else els.board.classList.add("glow-bad");
-      state.feedbackTimer = setTimeout(clearBoardGlow, 900);
+      els.board.classList.add(`glow-${category}`);
+      state.feedbackTimer = setTimeout(clearBoardGlow, 1000);
     }
 
     function updateAnalysisBar(cp, mate = null) {
@@ -2950,10 +3041,20 @@
         text = pawns >= 0 ? `+${pawns}` : `${pawns}`;
       }
 
+      const isFlipped = state.mode === "practice" && state.practice.playerColor === "b";
+      if (els.evalBar) {
+        els.evalBar.style.justifyContent = isFlipped ? "flex-start" : "flex-end";
+      }
+
       if (els.evalFill) els.evalFill.style.height = `${winPercent}%`;
       if (els.evalText) {
         els.evalText.textContent = text;
-        els.evalText.className = winPercent >= 50 ? "eval-text pos-bottom" : "eval-text pos-top";
+        const isWhiteAdv = winPercent >= 50;
+        if (isFlipped) {
+          els.evalText.className = isWhiteAdv ? "eval-text pos-top" : "eval-text pos-bottom";
+        } else {
+          els.evalText.className = isWhiteAdv ? "eval-text pos-bottom" : "eval-text pos-top";
+        }
       }
     }
 
@@ -2970,14 +3071,13 @@
       const history = state.practice.history;
       if (history.length === 0) return;
 
-      const last = history[history.length - 1];
-      if (last.isComputer) {
-        history.pop();
-        if (history.length > 0 && !history[history.length - 1].isComputer) {
-          history.pop();
-        }
-      } else {
-        history.pop();
+      if (!state.practice.redoStack) state.practice.redoStack = [];
+
+      const popped = history.pop();
+      state.practice.redoStack.push(popped);
+
+      if (popped.isComputer && history.length > 0 && !history[history.length - 1].isComputer) {
+        state.practice.redoStack.push(history.pop());
       }
 
       let fenToRestore = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -3005,9 +3105,41 @@
       updateAnalysisBarForFen(state.boardGame.fen());
     }
 
+    async function redoPracticeMove() {
+      if (state.mode !== "practice" || !state.practice.gameActive) return;
+      const redoStack = state.practice.redoStack;
+      if (!redoStack || redoStack.length === 0) return;
+
+      stopStockfish();
+      state.practice.isThinking = false;
+
+      const item = redoStack.pop();
+      state.practice.history.push(item);
+
+      if (!item.isComputer && redoStack.length > 0 && redoStack[redoStack.length - 1].isComputer) {
+        state.practice.history.push(redoStack.pop());
+      }
+
+      const lastItem = state.practice.history[state.practice.history.length - 1];
+      state.boardGame = new Chess(lastItem.fenAfter);
+      state.selected = null;
+      state.legalTargets = [];
+      state.legalCaptures = [];
+
+      const moveParsed = parseUci(lastItem.move);
+      state.lastMove = [moveParsed.from, moveParsed.to];
+
+      state.feedbackText = lastItem.feedback ? `Move ${lastItem.san} (${lastItem.feedback})` : `Move ${lastItem.san}`;
+      state.feedbackClass = lastItem.feedback === "best" || lastItem.feedback === "good" ? "good" : lastItem.feedback === "inaccuracy" ? "warn" : "bad";
+
+      renderAll();
+      updateAnalysisBarForFen(state.boardGame.fen());
+    }
+
     function renderPracticeDetails() {
       if (state.mode !== "practice") return;
-
+      const hdr = document.getElementById("trainerHeader");
+      if (hdr) hdr.textContent = "Practice Mode";
       const colorStr = state.practice.playerColor === "w" ? "White" : "Black";
       const level = state.practice.level;
 

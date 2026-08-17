@@ -191,8 +191,9 @@
       width: min(100%, calc(100vh - 178px), 900px);
       max-width: 100%;
       max-height: 100%;
-      aspect-ratio: 1;
-      display: block;
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
     }
 
     .promo-overlay {
@@ -244,9 +245,13 @@
       border: 1px solid rgba(32, 33, 36, 0.34);
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
       touch-action: manipulation;
-      width: 100%;
-      height: 100%;
+      flex: 1;
+      aspect-ratio: 1;
       transition: box-shadow 160ms ease;
+    }
+
+    .board.glow-warn {
+      box-shadow: 0 0 0 5px rgba(217, 119, 6, 0.25), 0 0 28px rgba(217, 119, 6, 0.8), 0 12px 28px rgba(51, 34, 18, 0.22);
     }
 
     .board.glow-good {
@@ -311,6 +316,7 @@
     .square.alt-highlight { box-shadow: inset 0 0 0 999px rgba(39, 107, 99, 0.28); }
     .square.feedback-good { box-shadow: inset 0 0 0 999px rgba(38, 115, 77, 0.32); }
     .square.feedback-bad { box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.32); }
+    .square.feedback-warn { box-shadow: inset 0 0 0 999px rgba(217, 119, 6, 0.32); }
     .square.check {
       box-shadow: inset 0 0 0 999px rgba(179, 58, 47, 0.42);
     }
@@ -630,9 +636,115 @@
       background: var(--panel-soft);
     }
 
-    body.mode-replay .train-only { display: none; }
-    body.mode-train .replay-only { display: none; }
+    body.mode-replay .train-only, body.mode-replay .practice-only { display: none !important; }
+    body.mode-train .replay-only, body.mode-train .practice-only { display: none !important; }
+    body.mode-practice .train-only, body.mode-practice .replay-only, body.mode-practice .train-replay-only { display: none !important; }
+    body:not(.mode-practice) .practice-only { display: none !important; }
+    body.mode-practice .eval-bar { display: flex !important; }
+    body:not(.mode-practice) .eval-bar { display: none !important; }
 
+    .eval-bar {
+      width: 26px;
+      background: #262421;
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      border: 1px solid rgba(0,0,0,0.22);
+      box-shadow: inset 0 0 4px rgba(0,0,0,0.4);
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .eval-fill {
+      width: 100%;
+      height: 50%;
+      background: #ffffff;
+      transition: height 250ms ease-out;
+    }
+
+    .eval-text {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      font-size: 0.68rem;
+      font-weight: 850;
+      z-index: 2;
+      pointer-events: none;
+      left: 0;
+      line-height: 1.2;
+      padding: 2px 0;
+    }
+
+    .eval-text.pos-bottom {
+      bottom: 4px;
+      color: #111;
+    }
+
+    .eval-text.pos-top {
+      top: 4px;
+      color: #fff;
+    }
+
+    .side-selector {
+      display: flex;
+      gap: 0.35rem;
+      margin-top: 0.25rem;
+    }
+
+    .side-btn {
+      flex: 1;
+      padding: 0.4rem 0.2rem;
+      font-size: 0.82rem;
+      background: var(--panel-soft);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-weight: 650;
+      min-height: 34px;
+    }
+
+    .side-btn:hover {
+      border-color: var(--accent);
+    }
+
+    .side-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .practice-log {
+      max-height: 220px;
+      min-height: 100px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.5rem;
+      background: var(--panel-soft);
+      font-size: 0.84rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .log-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.25rem 0.35rem;
+      border-radius: 4px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .badge-best { background: rgba(21, 128, 61, 0.15); color: #15803d; border: 1px solid rgba(21, 128, 61, 0.3); }
+    .badge-good { background: rgba(37, 99, 235, 0.15); color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.3); }
+    .badge-inaccuracy { background: rgba(217, 119, 6, 0.15); color: #d97706; border: 1px solid rgba(217, 119, 6, 0.3); }
+    .badge-mistake { background: rgba(234, 88, 12, 0.15); color: #ea580c; border: 1px solid rgba(234, 88, 12, 0.3); }
+    .badge-blunder { background: rgba(220, 38, 38, 0.15); color: #dc2626; border: 1px solid rgba(220, 38, 38, 0.3); }
     @media (min-width: 1500px) {
       .layout {
         grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
@@ -692,7 +804,7 @@
       <div class="controls" style="gap:0.4rem">
         <button id="modeTrainBtn" class="accent">Train</button>
         <button id="modeReplayBtn" class="secondary">Replay</button>
-      </div>
+        <button id="modePracticeBtn" class="secondary">Practice</button>
       <input id="username" autocomplete="username" placeholder="Lichess username">
       <button id="fetchBtn" class="accent">Update</button>
       <button id="fullFetchBtn" class="secondary">Full Refresh</button>
@@ -719,16 +831,24 @@
 
         <div class="panel board-panel">
           <div class="board-shell">
+            <div id="evalBar" class="eval-bar">
+              <div id="evalFill" class="eval-fill"></div>
+              <div id="evalText" class="eval-text">+0.0</div>
+            </div>
             <div id="board" class="board" aria-label="Chess board"></div>
           </div>
           <div class="under-board">
             <div class="controls">
-              <button id="prevBtn" class="secondary">Prev</button>
-              <button id="nextBtn" class="secondary">Next</button>
-              <button id="resetBtn" class="secondary">Reset</button>
-              <button id="showBtn" class="secondary">Show Answer</button>
-              <button id="analysisBtn" class="accent">Analyze on Lichess</button>
-              <label class="toggle"><input id="autoNextToggle" type="checkbox"> Auto-next</label>
+              <button id="prevBtn" class="secondary train-replay-only">Prev</button>
+              <button id="nextBtn" class="secondary train-replay-only">Next</button>
+              <button id="resetBtn" class="secondary train-replay-only">Reset</button>
+              <button id="showBtn" class="secondary train-replay-only">Show Answer</button>
+              <button id="analysisBtn" class="accent train-replay-only">Analyze on Lichess</button>
+              <label class="toggle train-replay-only"><input id="autoNextToggle" type="checkbox"> Auto-next</label>
+
+              <button id="undoBtn" class="secondary practice-only">Undo Move</button>
+              <button id="restartPracticeBtn" class="secondary practice-only">Restart Game</button>
+              <button id="newPracticeUnderBtn" class="accent practice-only">New Game</button>
             </div>
             <div class="facts">
               <div class="fact"><span>Source</span><strong id="sourceFact">-</strong></div>
@@ -795,6 +915,41 @@
           <strong>No local puzzles yet.</strong>
           <p class="muted">Use Update after entering a username. Only games with Lichess computer analysis are imported.</p>
         </section>
+        <section id="practiceSection" class="practice-only">
+          <h2 class="section-title">Practice vs Stockfish</h2>
+          
+          <div class="filter-field">Play As
+            <div class="side-selector">
+              <button type="button" id="sideWhiteBtn" class="side-btn active">White</button>
+              <button type="button" id="sideRandomBtn" class="side-btn">Random</button>
+              <button type="button" id="sideBlackBtn" class="side-btn">Black</button>
+            </div>
+          </div>
+
+          <div class="filter-field" style="margin-top:0.5rem">Engine Strength
+            <select id="practiceLevelSelect">
+              <option value="1">Level 1 (Beginner ~800)</option>
+              <option value="2">Level 2 (Easy ~1100)</option>
+              <option value="3" selected>Level 3 (Casual ~1400)</option>
+              <option value="4">Level 4 (Intermediate ~1700)</option>
+              <option value="5">Level 5 (Advanced ~2000)</option>
+              <option value="6">Level 6 (Expert ~2300)</option>
+              <option value="7">Level 7 (Master ~2600)</option>
+              <option value="8">Level 8 (Max ~3000)</option>
+            </select>
+          </div>
+
+          <div class="controls" style="margin-top:0.6rem">
+            <button id="startPracticeBtn" class="accent" style="width:100%">New Game</button>
+          </div>
+
+          <div style="margin-top:0.75rem">
+            <h3 class="section-title" style="font-size:0.85rem; margin-bottom:0.4rem">Move History</h3>
+            <div id="practiceMoveLog" class="practice-log">
+              <span class="muted">Game started. Make your move!</span>
+            </div>
+          </div>
+        </section>
       </aside>
     </main>
   </div>
@@ -848,7 +1003,17 @@
       altMoves: [],
       altHighlight: [],
       apiNextAt: {},
-      apiQueue: {}
+      apiQueue: {},
+      practice: {
+        chosenSide: "w",
+        playerColor: "w",
+        level: 3,
+        history: [],
+        isThinking: false,
+        gameActive: false,
+        evalCp: 0,
+        evalMate: null
+      }
     };
 
     const els = {};
@@ -875,7 +1040,10 @@
         "reviewCount", "missedCount", "emptyState", "authState", "loginBtn", "logoutBtn",
         "studyIdInput", "exportBtn", "syncBtn", "autoNextToggle", "evalDropFilter", "altMoves",
         "modeTrainBtn", "modeReplayBtn", "importReplayBtn", "replaySection",
-        "replayTotalStat", "replayAvgRatingStat", "replaySolvedStat", "replaySuccessStat"
+        "replayTotalStat", "replayAvgRatingStat", "replaySolvedStat", "replaySuccessStat",
+        "modePracticeBtn", "evalBar", "evalFill", "evalText", "undoBtn", "restartPracticeBtn",
+        "newPracticeUnderBtn", "sideWhiteBtn", "sideRandomBtn", "sideBlackBtn",
+        "practiceLevelSelect", "startPracticeBtn", "practiceMoveLog", "practiceSection"
       ].forEach(id => els[id] = document.getElementById(id));
     }
 
@@ -887,8 +1055,19 @@
       });
       els.modeTrainBtn.addEventListener("click", () => setMode("train"));
       els.modeReplayBtn.addEventListener("click", () => setMode("replay"));
+      els.modePracticeBtn.addEventListener("click", () => setMode("practice"));
+      els.sideWhiteBtn.addEventListener("click", () => selectPracticeSide("w"));
+      els.sideRandomBtn.addEventListener("click", () => selectPracticeSide("random"));
+      els.sideBlackBtn.addEventListener("click", () => selectPracticeSide("b"));
+      els.practiceLevelSelect.addEventListener("change", () => {
+        state.practice.level = parseInt(els.practiceLevelSelect.value, 10);
+        renderPracticeDetails();
+      });
+      els.startPracticeBtn.addEventListener("click", startNewPracticeGame);
+      els.newPracticeUnderBtn.addEventListener("click", startNewPracticeGame);
+      els.restartPracticeBtn.addEventListener("click", restartPracticeGame);
+      els.undoBtn.addEventListener("click", undoPracticeMove);
       els.importReplayBtn.addEventListener("click", importReplayPuzzles);
-      els.prevBtn.addEventListener("click", () => moveQueue(-1));
       els.nextBtn.addEventListener("click", () => moveQueue(1));
       els.resetBtn.addEventListener("click", resetPuzzle);
       els.showBtn.addEventListener("click", showAnswer);
@@ -911,13 +1090,22 @@
 
     function setMode(mode) {
       state.mode = mode;
-      document.body.className = mode === "replay" ? "mode-replay" : "mode-train";
-      els.modeTrainBtn.className = mode === "replay" ? "secondary" : "accent";
+      document.body.className = mode === "replay" ? "mode-replay" : mode === "practice" ? "mode-practice" : "mode-train";
+      els.modeTrainBtn.className = mode === "train" ? "accent" : "secondary";
       els.modeReplayBtn.className = mode === "replay" ? "accent" : "secondary";
-      state.index = 0;
-      buildQueue();
-      loadCurrentPuzzle();
-      renderAll();
+      els.modePracticeBtn.className = mode === "practice" ? "accent" : "secondary";
+      if (mode === "practice") {
+        if (!state.practice.gameActive) {
+          startNewPracticeGame();
+        } else {
+          renderAll();
+        }
+      } else {
+        state.index = 0;
+        buildQueue();
+        loadCurrentPuzzle();
+        renderAll();
+      }
     }
 
     function currentStore() {
@@ -1476,7 +1664,6 @@
         notesUpdatedAt: null
       });
     }
-
     function bestMoveFromAnalysis(fen, analysisItem) {
       const candidates = [
         analysisItem?.best,
@@ -1634,8 +1821,12 @@
 
     function renderAll() {
       renderBoard();
-      renderPuzzleDetails();
-      renderStats();
+      if (state.mode === "practice") {
+        renderPracticeDetails();
+      } else {
+        renderPuzzleDetails();
+        renderStats();
+      }
       renderButtons();
     }
 
@@ -1671,6 +1862,12 @@
 
     function squareAt(row, col) {
       const files = "abcdefgh";
+      if (state.mode === "practice") {
+        if (state.practice.playerColor === "b") {
+          return `${files[7 - col]}${row + 1}`;
+        }
+        return `${files[col]}${8 - row}`;
+      }
       if (state.puzzle?.side === "b") {
         return `${files[7 - col]}${row + 1}`;
       }
@@ -1786,20 +1983,28 @@
       els.totalStat.textContent = total;
       els.dueStat.textContent = due;
       els.rightStat.textContent = correct;
-      els.accuracyStat.textContent = attempts ? `${Math.round(correct / attempts * 100)}%` : "0%";
-      setBar("new", fresh, total);
-      setBar("learning", learning, total);
-      setBar("review", review, total);
-      setBar("missed", missed, total);
-      els.emptyState.style.display = state.puzzles.length ? "none" : "block";
-    }
-
-    function setBar(name, count, total) {
+         btn.addEventListener('click', () => {
+           removePromotionPicker();
+           const move = state.boardGame.move({ from, to, promotion: p });
+           if (!move) return;
+           state.lastMove = [move.from, move.to];
+           clearSelection(false);
+           if (state.mode === "practice") evaluatePracticeUserMove(move);
+           else if (state.mode === "replay") evaluateReplayMove(move);
+           else evaluateMove(move);
+           renderBoard();
+         });
       els[`${name}Count`].textContent = count;
       els[`${name}Bar`].style.width = total ? `${Math.max(3, Math.round(count / total * 100))}%` : "0";
     }
 
     function renderButtons() {
+      if (state.mode === "practice") {
+        els.undoBtn.disabled = !state.practice.gameActive || state.practice.history.length === 0 || state.practice.isThinking;
+        els.restartPracticeBtn.disabled = !state.practice.gameActive || state.practice.isThinking;
+        els.newPracticeUnderBtn.disabled = state.practice.isThinking;
+        return;
+      }
       const hasPuzzle = Boolean(state.puzzle);
       els.prevBtn.disabled = !hasPuzzle || state.index <= 0;
       els.nextBtn.disabled = !hasPuzzle || state.index >= state.queue.length - 1;
@@ -1817,8 +2022,13 @@
         state.suppressClick = false;
         return;
       }
-      if (!state.puzzle || state.solvedThisView) return;
-      if (state.mode === "replay" && state.replayLocked) return;
+      if (state.mode === "practice") {
+        if (state.practice.isThinking || !state.practice.gameActive || state.boardGame.game_over()) return;
+        if (state.boardGame.turn() !== state.practice.playerColor && !state.selected) return;
+      } else {
+        if (!state.puzzle || state.solvedThisView) return;
+        if (state.mode === "replay" && state.replayLocked) return;
+      }
       const piece = state.boardGame.get(square);
       if (!state.selected) {
         if (!piece || piece.color !== state.boardGame.turn()) return;
@@ -1840,10 +2050,13 @@
     }
 
     function handlePointerDown(event, square) {
-      if (!state.puzzle || state.solvedThisView || event.button !== 0) return;
-      if (state.mode === "replay" && state.replayLocked) return;
+      if (state.mode === "practice") {
+        if (state.practice.isThinking || !state.practice.gameActive || state.boardGame.game_over() || event.button !== 0) return;
+      } else {
+        if (!state.puzzle || state.solvedThisView || event.button !== 0) return;
+        if (state.mode === "replay" && state.replayLocked) return;
+      }
       const piece = state.boardGame.get(square);
-      if (!piece || piece.color !== state.boardGame.turn()) return;
       state.dragFrom = square;
       state.dragPiece = piece;
       createDragGhost(piece, event.clientX, event.clientY);
@@ -1903,6 +2116,9 @@
     }
 
     function tryMove(from, to) {
+      if (state.mode === "practice") {
+        if (state.practice.isThinking || state.boardGame.turn() !== state.practice.playerColor) return false;
+      }
       if (isPromotion(from, to)) {
         showPromotionPicker(from, to);
         return true;
@@ -1911,7 +2127,8 @@
       if (!move) return false;
       state.lastMove = [move.from, move.to];
       clearSelection(false);
-      if (state.mode === "replay") evaluateReplayMove(move);
+      if (state.mode === "practice") evaluatePracticeUserMove(move);
+      else if (state.mode === "replay") evaluateReplayMove(move);
       else evaluateMove(move);
       return true;
     }
@@ -2464,6 +2681,401 @@
       ].map(([key, value]) => `[${key} "${escapePgn(String(value))}"]`).join("\n");
       const note = puzzle.notes ? ` { ${escapeComment(puzzle.notes)} }` : "";
       return `${tags}\n\n${movetext.trim()}${note} *`;
+    }
+
+    let sfWorker = null;
+    let sfPendingCallback = null;
+
+    function getStockfishWorker() {
+      if (sfWorker) return sfWorker;
+      const blob = new Blob([
+        'importScripts("https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js");'
+      ], { type: "application/javascript" });
+      sfWorker = new Worker(URL.createObjectURL(blob));
+      sfWorker.onmessage = (e) => {
+        if (sfPendingCallback && typeof e.data === "string") {
+          sfPendingCallback(e.data);
+        }
+      };
+      sfWorker.postMessage("uci");
+      sfWorker.postMessage("ucinewgame");
+      return sfWorker;
+    }
+
+    function stopStockfish() {
+      if (sfWorker) {
+        sfWorker.postMessage("stop");
+        sfPendingCallback = null;
+      }
+    }
+
+    function analyzePosition(fen, depth = 10) {
+      return new Promise((resolve) => {
+        const worker = getStockfishWorker();
+        let bestMove = null;
+        let evalCp = 0;
+        let mate = null;
+
+        const handler = (data) => {
+          if (data.startsWith("info") && data.includes("score")) {
+            const cpMatch = data.match(/score cp (-?\d+)/);
+            const mateMatch = data.match(/score mate (-?\d+)/);
+            if (cpMatch) {
+              evalCp = parseInt(cpMatch[1], 10);
+              mate = null;
+            } else if (mateMatch) {
+              mate = parseInt(mateMatch[1], 10);
+            }
+          }
+          if (data.startsWith("bestmove")) {
+            const parts = data.split(" ");
+            bestMove = parts[1] !== "(none)" ? parts[1] : null;
+            sfPendingCallback = null;
+            resolve({ bestMove, cp: evalCp, mate });
+          }
+        };
+
+        sfPendingCallback = handler;
+        worker.postMessage("position fen " + fen);
+        worker.postMessage("go depth " + depth);
+      });
+    }
+
+    function getComputerMove(fen, level = 3) {
+      return new Promise((resolve) => {
+        const worker = getStockfishWorker();
+        const skillMap = [0, 2, 5, 8, 11, 14, 17, 20];
+        const skill = skillMap[Math.min(Math.max(1, level), 8) - 1];
+        const depthMap = [2, 4, 6, 8, 10, 12, 14, 16];
+        const depth = depthMap[Math.min(Math.max(1, level), 8) - 1];
+
+        const handler = (data) => {
+          if (data.startsWith("bestmove")) {
+            const parts = data.split(" ");
+            const bestMove = parts[1] !== "(none)" ? parts[1] : null;
+            sfPendingCallback = null;
+            resolve(bestMove);
+          }
+        };
+
+        sfPendingCallback = handler;
+        worker.postMessage("setoption name Skill Level value " + skill);
+        worker.postMessage("position fen " + fen);
+        worker.postMessage("go depth " + depth);
+      });
+    }
+
+    function selectPracticeSide(side) {
+      state.practice.chosenSide = side;
+      els.sideWhiteBtn.classList.toggle("active", side === "w");
+      els.sideRandomBtn.classList.toggle("active", side === "random");
+      els.sideBlackBtn.classList.toggle("active", side === "b");
+    }
+
+    async function startNewPracticeGame() {
+      stopStockfish();
+      const side = state.practice.chosenSide;
+      const playerColor = side === "random" ? (Math.random() < 0.5 ? "w" : "b") : side;
+      state.practice.playerColor = playerColor;
+      state.practice.level = parseInt(els.practiceLevelSelect.value, 10) || 3;
+      state.practice.history = [];
+      state.practice.isThinking = false;
+      state.practice.gameActive = true;
+      state.practice.evalCp = 0;
+      state.practice.evalMate = null;
+
+      state.boardGame = new Chess();
+      state.selected = null;
+      state.legalTargets = [];
+      state.legalCaptures = [];
+      state.lastMove = [];
+      state.playedMove = [];
+      state.altHighlight = [];
+      state.feedbackText = "";
+      state.feedbackClass = "";
+      clearBoardGlow();
+
+      renderAll();
+      updateAnalysisBarForFen(state.boardGame.fen());
+
+      if (playerColor === "b") {
+        await triggerComputerMove();
+      }
+    }
+
+    function restartPracticeGame() {
+      startNewPracticeGame();
+    }
+
+    async function triggerComputerMove() {
+      if (!state.practice.gameActive || state.boardGame.game_over()) return;
+      state.practice.isThinking = true;
+      renderPracticeDetails();
+      renderButtons();
+
+      const fen = state.boardGame.fen();
+      const compMoveUci = await getComputerMove(fen, state.practice.level);
+
+      state.practice.isThinking = false;
+      if (!state.practice.gameActive || state.boardGame.fen() !== fen) return;
+
+      if (compMoveUci) {
+        const parsed = parseUci(compMoveUci);
+        const move = state.boardGame.move(parsed);
+        if (move) {
+          state.lastMove = [move.from, move.to];
+          state.practice.history.push({
+            fen,
+            fenAfter: state.boardGame.fen(),
+            move: compMoveUci,
+            san: move.san,
+            player: state.practice.playerColor === "w" ? "b" : "w",
+            isComputer: true
+          });
+          renderBoard();
+          updateAnalysisBarForFen(state.boardGame.fen());
+        }
+      }
+
+      renderPracticeDetails();
+      renderButtons();
+    }
+
+    async function evaluatePracticeUserMove(move) {
+      const fenBefore = move.before || state.boardGame.fen();
+      const userUci = moveToUci(move);
+      const userSan = move.san;
+      const userColor = move.color;
+
+      state.feedbackText = "Analyzing move...";
+      state.feedbackClass = "";
+      renderPracticeDetails();
+
+      const analysisBefore = await analyzePosition(fenBefore, 10);
+      const bestUci = analysisBefore.bestMove;
+      const bestSan = bestUci ? sanFromFen(fenBefore, bestUci) : null;
+      const evalBefore = analysisBefore.cp;
+
+      const evalBeforeUser = userColor === "w" ? evalBefore : -evalBefore;
+
+      let evalDrop = 0;
+      let category = "best";
+      let evalAfter = evalBefore;
+
+      if (bestUci && userUci === bestUci) {
+        category = "best";
+        evalDrop = 0;
+      } else {
+        const fenAfter = state.boardGame.fen();
+        const analysisAfter = await analyzePosition(fenAfter, 10);
+        evalAfter = analysisAfter.cp;
+
+        const evalAfterUser = userColor === "w" ? evalAfter : -evalAfter;
+        evalDrop = Math.max(0, evalBeforeUser - evalAfterUser);
+
+        if (evalDrop <= 10) category = "best";
+        else if (evalDrop <= 50) category = "good";
+        else if (evalDrop <= 120) category = "inaccuracy";
+        else if (evalDrop <= 300) category = "mistake";
+        else category = "blunder";
+      }
+
+      state.practice.history.push({
+        fen: fenBefore,
+        fenAfter: state.boardGame.fen(),
+        move: userUci,
+        san: userSan,
+        player: userColor,
+        isComputer: false,
+        bestSan,
+        bestUci,
+        evalDrop,
+        feedback: category
+      });
+
+      let feedbackLabel = "";
+      if (category === "best") feedbackLabel = `Best move! (${userSan})`;
+      else if (category === "good") feedbackLabel = `Good move (${userSan})`;
+      else if (category === "inaccuracy") feedbackLabel = `Inaccuracy (${userSan}${bestSan ? `?! - Best was ${bestSan}` : ""})`;
+      else if (category === "mistake") feedbackLabel = `Mistake (${userSan}${bestSan ? `? - Best was ${bestSan}` : ""})`;
+      else feedbackLabel = `Blunder (${userSan}${bestSan ? `?? - Best was ${bestSan}` : ""})`;
+
+      const evalPawns = (evalAfter / 100).toFixed(1);
+      const evalStr = evalPawns >= 0 ? `+${evalPawns}` : `${evalPawns}`;
+      state.feedbackText = `${feedbackLabel} | Eval: ${evalStr}`;
+      state.feedbackClass = category === "best" || category === "good" ? "good" : category === "inaccuracy" ? "warn" : "bad";
+
+      pulseBoardCategory(category);
+      renderBoard({
+        good: category === "best" || category === "good",
+        warn: category === "inaccuracy",
+        squares: [move.from, move.to]
+      });
+
+      updateAnalysisBar(evalAfter, analysisBefore.mate);
+      renderPracticeDetails();
+
+      if (state.boardGame.game_over()) {
+        renderPracticeDetails();
+        return;
+      }
+
+      await triggerComputerMove();
+    }
+
+    function pulseBoardCategory(category) {
+      clearBoardGlow();
+      if (category === "best" || category === "good") els.board.classList.add("glow-good");
+      else if (category === "inaccuracy") els.board.classList.add("glow-warn");
+      else els.board.classList.add("glow-bad");
+      state.feedbackTimer = setTimeout(clearBoardGlow, 900);
+    }
+
+    function updateAnalysisBar(cp, mate = null) {
+      let winPercent = 50;
+      let text = "+0.0";
+
+      if (mate != null) {
+        if (mate > 0) {
+          winPercent = 100;
+          text = `M${mate}`;
+        } else {
+          winPercent = 0;
+          text = `-M${Math.abs(mate)}`;
+        }
+      } else if (cp != null) {
+        winPercent = 50 + 50 * (2 / Math.PI) * Math.atan(cp / 200);
+        winPercent = Math.min(99, Math.max(1, winPercent));
+        const pawns = (cp / 100).toFixed(1);
+        text = pawns >= 0 ? `+${pawns}` : `${pawns}`;
+      }
+
+      if (els.evalFill) els.evalFill.style.height = `${winPercent}%`;
+      if (els.evalText) {
+        els.evalText.textContent = text;
+        els.evalText.className = winPercent >= 50 ? "eval-text pos-bottom" : "eval-text pos-top";
+      }
+    }
+
+    async function updateAnalysisBarForFen(fen) {
+      const res = await analyzePosition(fen, 8);
+      updateAnalysisBar(res.cp, res.mate);
+    }
+
+    async function undoPracticeMove() {
+      if (state.mode !== "practice" || !state.practice.gameActive) return;
+      stopStockfish();
+      state.practice.isThinking = false;
+
+      const history = state.practice.history;
+      if (history.length === 0) return;
+
+      const last = history[history.length - 1];
+      if (last.isComputer) {
+        history.pop();
+        if (history.length > 0 && !history[history.length - 1].isComputer) {
+          history.pop();
+        }
+      } else {
+        history.pop();
+      }
+
+      let fenToRestore = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+      if (history.length > 0) {
+        fenToRestore = history[history.length - 1].fenAfter;
+      }
+
+      state.boardGame = new Chess(fenToRestore);
+      state.selected = null;
+      state.legalTargets = [];
+      state.legalCaptures = [];
+
+      if (history.length > 0) {
+        const prevMove = parseUci(history[history.length - 1].move);
+        state.lastMove = [prevMove.from, prevMove.to];
+      } else {
+        state.lastMove = [];
+      }
+
+      state.feedbackText = "Undid move. Make a new move!";
+      state.feedbackClass = "";
+      clearBoardGlow();
+
+      renderAll();
+      updateAnalysisBarForFen(state.boardGame.fen());
+    }
+
+    function renderPracticeDetails() {
+      if (state.mode !== "practice") return;
+
+      const colorStr = state.practice.playerColor === "w" ? "White" : "Black";
+      const level = state.practice.level;
+
+      if (state.boardGame.in_checkmate()) {
+        const winner = state.boardGame.turn() === "w" ? "Black" : "White";
+        els.prompt.textContent = `Checkmate! ${winner} wins.`;
+      } else if (state.boardGame.in_draw()) {
+        els.prompt.textContent = "Game drawn!";
+      } else if (state.practice.isThinking) {
+        els.prompt.textContent = `Stockfish (Level ${level}) is thinking...`;
+      } else {
+        const isUserTurn = state.boardGame.turn() === state.practice.playerColor;
+        els.prompt.textContent = `Playing as ${colorStr} vs Stockfish (Level ${level}). ${isUserTurn ? "Your turn." : "Waiting for computer..."}`;
+      }
+
+      if (state.feedbackText) {
+        els.result.textContent = state.feedbackText;
+        els.result.className = `result ${state.feedbackClass}`.trim();
+      } else {
+        els.result.textContent = `Practice game. Side: ${colorStr}. Level: ${level}.`;
+        els.result.className = "result";
+      }
+
+      els.sourceFact.textContent = `Practice Mode`;
+      els.evalFact.textContent = `Level ${level}`;
+      els.dueFact.textContent = colorStr;
+      els.queueFact.textContent = `vs Stockfish`;
+
+      renderPracticeMoveLog();
+    }
+
+    function renderPracticeMoveLog() {
+      const container = els.practiceMoveLog;
+      if (!container) return;
+      container.innerHTML = "";
+
+      const history = state.practice.history;
+      if (history.length === 0) {
+        container.innerHTML = '<span class="muted">Game started. Make your move!</span>';
+        return;
+      }
+
+      for (let i = 0; i < history.length; i += 2) {
+        const move1 = history[i];
+        const move2 = history[i + 1];
+        const moveNum = Math.floor(i / 2) + 1;
+
+        const row = document.createElement("div");
+        row.className = "log-entry";
+
+        let m1HTML = `<strong>${moveNum}.</strong> ${move1.san}`;
+        if (move1.feedback) {
+          m1HTML += ` <span class="move-badge badge-${move1.feedback}">${move1.feedback}</span>`;
+        }
+
+        let m2HTML = "";
+        if (move2) {
+          m2HTML = `${move2.san}`;
+          if (move2.feedback) {
+            m2HTML += ` <span class="move-badge badge-${move2.feedback}">${move2.feedback}</span>`;
+          }
+        }
+
+        row.innerHTML = `<div>${m1HTML}</div><div>${m2HTML}</div>`;
+        container.appendChild(row);
+      }
+
+      container.scrollTop = container.scrollHeight;
     }
   </script>
 </body>
